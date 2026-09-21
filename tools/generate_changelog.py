@@ -28,6 +28,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# The release notes contain emoji section headings. A Windows console defaults
+# to cp1252, which cannot encode them, so printing would raise
+# UnicodeEncodeError. CI runs on Linux where stdout is already UTF-8, but the
+# script has to be usable locally too.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Ordered: this is the order sections appear in the release notes.
 CATEGORIES: tuple[tuple[str, str, str], ...] = (
     ("feat", "Features", "✨"),

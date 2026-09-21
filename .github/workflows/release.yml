@@ -1,0 +1,142 @@
+name: Release
+
+# Triggered by pushing a semantic version tag:
+#
+#     git tag v1.1.0
+#     git push origin v1.1.0
+#
+# Everything from there is automatic: validate, build, generate the changelog
+# from the commits since the previous tag, publish the release and attach the
+# pack. The version is taken from the tag and from nowhere else, so there is no
+# second number to keep in sync.
+#
+# A release is only ever published from a fully validated build. validate.yml
+# runs as a dependency, and the publish step is the last thing in the job, so a
+# failure anywhere leaves no release and no artifact behind.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate.yml
+
+  release:
+    name: Build and publish release
+    needs: validate
+    runs-on: ubuntu-latest
+
+    # Elevated only here, and only to create the release.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          # The changelog needs the full history and every tag to find the
+          # previous release. The default shallow clone has neither.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$TAG' does not match vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Releasing $TAG"
+
+      - name: Refuse to overwrite an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "::error::Release ${{ steps.version.outputs.tag }} already exists."
+            echo "Delete it first if you intend to republish."
+            exit 1
+          fi
+
+          echo "No existing release for ${{ steps.version.outputs.tag }}."
+
+      - name: Write version into pack metadata
+        run: python tools/bump_version.py --from-tag "${{ steps.version.outputs.tag }}"
+
+      - name: Verify version metadata was applied
+        run: python tools/bump_version.py --version "${{ steps.version.outputs.version }}" --check
+
+      - name: Build release pack
+        run: python tools/build_pack.py --version "${{ steps.version.outputs.version }}"
+
+      - name: Verify the archive is well-formed
+        run: |
+          set -euo pipefail
+
+          ARCHIVE="dist/AstraRealism-v${{ steps.version.outputs.version }}.zip"
+
+          if [[ ! -f "$ARCHIVE" ]]; then
+            echo "::error::Expected archive $ARCHIVE was not produced"
+            exit 1
+          fi
+
+          # A pack whose shaders.properties is missing or misplaced loads as an
+          # empty entry in Iris, which is worse than failing loudly here.
+          if ! unzip -l "$ARCHIVE" | grep -q 'shaders/shaders.properties'; then
+            echo "::error::Archive does not contain shaders/shaders.properties"
+            exit 1
+          fi
+
+          unzip -t "$ARCHIVE" > /dev/null
+          echo "Archive verified: $(du -h "$ARCHIVE" | cut -f1)"
+
+      - name: Generate release notes
+        run: |
+          python tools/generate_changelog.py \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --output release-notes.md
+
+          echo "--- generated release notes ---"
+          cat release-notes.md
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstraRealism-${{ steps.version.outputs.tag }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+      # Last step: by the time this runs, validation, build, packaging and
+      # verification have all succeeded.
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "AstraRealism ${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            "dist/AstraRealism-v${{ steps.version.outputs.version }}.zip"
+
+          echo "Published ${{ steps.version.outputs.tag }}"

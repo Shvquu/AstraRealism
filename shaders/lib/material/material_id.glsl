@@ -44,7 +44,7 @@ const int ASTRA_BLOCK_POROUS    = 11;
  * so must be excluded from temporal reprojection.
  */
 int classifyMaterial(int blockId) {
-#if defined(PROGRAM_HAND)
+#if defined(PROGRAM_HAND) || defined(PROGRAM_HAND_WATER)
     return MATID_HAND;
 #elif defined(PROGRAM_ENTITIES)
     return MATID_ENTITY;

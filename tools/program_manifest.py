@@ -126,6 +126,12 @@ PROGRAMS: tuple[Program, ...] = (
              "held items, rendered with a compressed depth range"),
     _gbuffer("gbuffers_water", "PROGRAM_WATER",
              "translucent geometry: water, stained glass, ice"),
+    # Shipped explicitly rather than inheriting gbuffers_hand, because it is
+    # one of the three programs Iris draws AFTER the deferred pass. Inheriting
+    # would give it the gbuffer path, which by then has already been consumed,
+    # and a translucent held item would render as nothing at all.
+    _gbuffer("gbuffers_hand_water", "PROGRAM_HAND_WATER",
+             "translucent held items, drawn after the deferred pass"),
     _gbuffer("gbuffers_weather", "PROGRAM_WEATHER",
              "rain and snow particles"),
 

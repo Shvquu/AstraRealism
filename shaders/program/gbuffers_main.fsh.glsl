@@ -25,11 +25,27 @@
 // PATH SELECTION
 //==============================================================================
 
+/*
+ * Which path a program takes is decided entirely by whether Iris draws it
+ * before or after the deferred pass. Getting this wrong is silent and severe:
+ * forward-shading geometry that renders BEFORE deferred writes colour into
+ * colortex0 which deferred then overwrites, so the geometry simply disappears.
+ *
+ * After deferred (forward):
+ *   gbuffers_water, gbuffers_weather, gbuffers_hand_water - always
+ *   gbuffers_textured, gbuffers_textured_lit - these draw particles, and
+ *     `particles.ordering = after` in shaders.properties puts them after
+ *     deferred. That directive is set explicitly rather than relying on the
+ *     default, which varies with whether a deferred pass exists.
+ *
+ * Before deferred (gbuffer):
+ *   everything else, including gbuffers_basic and gbuffers_beaconbeam.
+ */
 #if defined(PROGRAM_SKYBASIC) || defined(PROGRAM_SKYTEXTURED)
     #define ASTRA_PATH_SKY
 #elif defined(PROGRAM_WATER) || defined(PROGRAM_WEATHER) \
-   || defined(PROGRAM_TEXTURED) || defined(PROGRAM_TEXTURED_LIT) \
-   || defined(PROGRAM_BASIC) || defined(PROGRAM_BEACONBEAM)
+   || defined(PROGRAM_HAND_WATER) \
+   || defined(PROGRAM_TEXTURED) || defined(PROGRAM_TEXTURED_LIT)
     #define ASTRA_PATH_FORWARD
 #else
     #define ASTRA_PATH_DEFERRED
@@ -90,11 +106,23 @@ void main() {
     SurfaceMaterial material = fetchMaterial(texcoord, vertexColor, materialId);
 
     /*
-     * Alpha test. Iris supplies the cutoff through alphaTestRef rather than
-     * applying it itself once the shader declares its own outputs, so the
-     * discard has to happen here or cutout foliage renders as solid quads.
+     * Alpha handling.
+     *
+     * Iris passes the cutoff through alphaTestRef rather than applying the test
+     * itself once a shader declares its own fragment outputs, so the discard
+     * has to happen here - otherwise cutout foliage renders as solid quads.
+     *
+     * The test only applies to the gbuffer path. Translucent geometry is not
+     * cutout geometry: water sits around 70% alpha and stained glass lower
+     * still, and testing them against the same reference would discard them
+     * outright. They only skip fragments that are fully transparent, which is
+     * a pure saving with no visual effect.
      */
-    if (material.alpha < alphaTestRef) discard;
+    #if defined(ASTRA_PATH_DEFERRED)
+        if (material.alpha < alphaTestRef) discard;
+    #else
+        if (material.alpha < 0.004) discard;
+    #endif
 
     vec3 shadingNormal = applyNormalMap(material.normalTangent, normal,
                                         tangent, bitangent);

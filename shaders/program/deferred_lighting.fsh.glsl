@@ -13,6 +13,12 @@
  */
 
 #include "/lib/common/common.glsl"
+
+// Tells the lighting composition that depthtex is readable here, which enables
+// screen-space contact shadows. Forward-shaded passes cannot set this, because
+// the geometry they shade has not finished writing depth yet.
+#define ASTRA_HAS_SCENE_DEPTH
+
 #include "/lib/lighting/composition.glsl"
 #include "/lib/atmosphere/scattering.glsl"
 #include "/lib/atmosphere/sky.glsl"

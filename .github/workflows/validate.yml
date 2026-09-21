@@ -1,0 +1,64 @@
+name: Validate
+
+# This workflow is the single definition of "the pack is correct".
+#
+# It is callable (`workflow_call`) so that build.yml and release.yml invoke it
+# rather than repeating the steps. That is what structurally guarantees a
+# release can never be published from a pack that failed validation - there is
+# no second, drifting copy of the checks to get out of sync.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+# Read-only. Validation never needs to write anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate and compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install glslang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends glslang-tools
+          glslangValidator --version
+
+      - name: Check dimension stubs are in sync
+        run: python tools/gen_dimension_stubs.py --check
+
+      - name: Validate pack structure and configuration
+        run: python tools/validate_shader.py --strict
+
+      - name: Run tooling tests
+        run: python -m unittest discover -s tests -v
+
+      # The real compiler pass. Every program is compiled for both supported
+      # Minecraft versions, all six quality presets, and with and without a
+      # LabPBR resource pack, so no #if branch escapes being checked.
+      - name: Compile all shader programs
+        run: python tools/glsl_compile.py --all-presets --required
+
+      - name: Verify the pack builds
+        run: python tools/build_pack.py --version ci

@@ -4,6 +4,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/lighting/brdf.glsl"
 #include "/lib/lighting/shadow.glsl"
+#include "/lib/lighting/contact_shadow.glsl"
 #include "/lib/lighting/blocklight.glsl"
 #include "/lib/atmosphere/sun_moon.glsl"
 #include "/lib/atmosphere/scattering.glsl"
@@ -76,6 +77,25 @@ vec3 computeLighting(LightingInputs surface) {
     ShadowResult shadow = sampleShadow(surface.scenePos, surface.geoNormal,
                                        geoNdotL, surface.dither);
 
+    /*
+     * Contact shadows recover detail below the shadow map's texel size. They
+     * need the scene depth buffer, so they are only available to passes that
+     * run after the geometry being shaded - forward-shaded translucents make do
+     * with the shadow map alone.
+     *
+     * Skipped where the shadow map already reports full occlusion, since there
+     * is nothing left to darken.
+     */
+#if ASTRA_ENABLE_CONTACT_SHADOWS && defined(ASTRA_HAS_SCENE_DEPTH)
+    if (shadow.visibility > 0.0 && geoNdotL > 0.0) {
+        shadow.visibility *= contactShadow(
+            sceneToView(surface.scenePos),
+            normalize(shadowLightPosition),
+            surface.dither
+        );
+    }
+#endif
+
     if (shadow.visibility > 0.0 && ndotl > 0.0) {
         BRDFResult brdf = evaluateBRDF(surface.normal, viewDir, lightDir,
                                        surface.albedo, f0, surface.roughness, metal);
@@ -135,6 +155,23 @@ vec3 computeLighting(LightingInputs surface) {
         result += surface.albedo * surface.indirect * occlusion * GI_STRENGTH;
     }
 #endif
+
+    //--------------------------------------------------------------------------
+    // Uniform ambient
+    //
+    // Not physically motivated, and deliberately small. It exists so that a
+    // user who turns global illumination off is not left with pitch-black
+    // shadow interiors. Raising it flattens the image, which is why the
+    // tooltip says so and the default is low.
+    //--------------------------------------------------------------------------
+
+    if (!metal) {
+        vec3 ambient = mix(blackbodyToRGB(float(BLOCKLIGHT_TEMPERATURE)),
+                           skyIrradiance * ASTRA_INV_PI,
+                           saturate(surface.lightmap.y));
+
+        result += surface.albedo * ambient * AMBIENT_INTENSITY * occlusion;
+    }
 
     //--------------------------------------------------------------------------
     // Block light

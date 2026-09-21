@@ -44,7 +44,7 @@ profile.CINEMATIC=Cinematic
 # Lighting
 # ------------------------------------------------------------------------------
 option.SUN_INTENSITY=Sun Intensity
-comment.SUN_INTENSITY=Radiance of direct sunlight before atmospheric extinction. Auto-exposure compensates for most of a change here, so raising it mainly increases contrast between lit and shadowed surfaces rather than overall brightness.
+comment.SUN_INTENSITY=Radiance of direct sunlight before atmospheric extinction. This is a physical radiance value, not a screen brightness - the exposure setting decides how it maps to the display. Raising it mainly increases contrast between lit and shadowed surfaces.
 
 option.MOON_INTENSITY=Moon Intensity
 comment.MOON_INTENSITY=Brightness of direct moonlight. Real moonlight is roughly 400,000x dimmer than sunlight; the default is far above that because a physically exact value would leave nights unplayable.
@@ -407,12 +407,12 @@ comment.BLOOM_MIPS=Number of levels in the bloom chain. More levels produce a wi
 # Exposure
 # ------------------------------------------------------------------------------
 option.EXPOSURE_MODE=Exposure Mode
-comment.EXPOSURE_MODE=Automatic adapts to scene brightness the way an eye does, so walking out of a cave briefly overexposes and then settles. Manual holds a fixed value.
+comment.EXPOSURE_MODE=Automatic adapts to scene brightness the way an eye does, so walking out of a cave briefly overexposes and then settles. Manual holds a fixed value. NOTE: automatic metering is not implemented yet and currently behaves as Manual.
 value.EXPOSURE_MODE.0=Manual
 value.EXPOSURE_MODE.1=Automatic
 
 option.MANUAL_EXPOSURE=Manual Exposure
-comment.MANUAL_EXPOSURE=Fixed exposure value, used only when the mode is Manual.
+comment.MANUAL_EXPOSURE=Fixed exposure value. The default is calibrated so a mid-grey surface in full daylight lands on a well-exposed midtone. Raise it if nights are too dark for you; until automatic exposure exists, one value cannot suit both.
 
 option.EXPOSURE_SPEED_UP=Adaptation Speed (Brightening)
 comment.EXPOSURE_SPEED_UP=How fast the eye adapts when moving into a brighter scene. Real eyes adapt to light faster than to dark, which is why this defaults higher than the other direction.

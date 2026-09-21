@@ -169,26 +169,88 @@ def flatten_includes(entry: Path, source_map: SourceMap) -> str:
     return "\n".join(output)
 
 
-def build_translation_unit(entry: Path, target: Target, defines: list[str],
-                           source_map: SourceMap) -> str:
+_OPTION_DEFINE_RE = re.compile(
+    r"^(?P<indent>\s*)(?P<commented>//\s*)?#define\s+(?P<name>[A-Za-z_]\w*)"
+    r"(?P<value>[ \t]+[^/\n]+?)?(?P<trailing>\s*//.*)?$"
+)
+
+_OPTION_CONST_RE = re.compile(
+    r"^(?P<indent>\s*)const\s+(?P<type>int|float|bool)\s+(?P<name>[A-Za-z_]\w*)"
+    r"\s*=\s*(?P<value>[^;]+);(?P<trailing>.*)$"
+)
+
+
+def apply_option_overrides(lines: list[str], settings: dict) -> list[str]:
+    """Rewrite option declarations in place, the way Iris does.
+
+    Iris does not prepend `#define NAME value` when a preset changes a setting -
+    it edits the declaration in the source. Prepending instead produces a macro
+    redefinition error as soon as the original declaration is reached, so the
+    harness has to match Iris's approach to compile the same code the driver
+    will see.
+    """
+    if not settings:
+        return lines
+
+    result = list(lines)
+
+    for index, line in enumerate(result):
+        const_match = _OPTION_CONST_RE.match(line)
+        if const_match and const_match.group("name") in settings:
+            value = settings[const_match.group("name")]
+            if isinstance(value, bool):
+                value = "true" if value else "false"
+            result[index] = (
+                f"{const_match.group('indent')}const {const_match.group('type')} "
+                f"{const_match.group('name')} = {value};"
+                f"{const_match.group('trailing')}"
+            )
+            continue
+
+        define_match = _OPTION_DEFINE_RE.match(line)
+        if not define_match:
+            continue
+
+        name = define_match.group("name")
+        if name not in settings:
+            continue
+
+        value = settings[name]
+        indent = define_match.group("indent")
+        trailing = define_match.group("trailing") or ""
+
+        if value is True:
+            result[index] = f"{indent}#define {name}{trailing}"
+        elif value is False:
+            # A disabled boolean must vanish from the preprocessor's view
+            # entirely, because the shader tests it with #ifdef.
+            result[index] = f"{indent}//#define {name}{trailing}"
+        else:
+            result[index] = f"{indent}#define {name} {value}{trailing}"
+
+    return result
+
+
+def build_translation_unit(entry: Path, target: Target, settings: dict,
+                           source_map: SourceMap, labpbr: bool = True) -> str:
     """Produce a self-contained GLSL translation unit for glslang."""
     flat = flatten_includes(entry, source_map)
 
     # The version directive must come first, so lift it out and re-emit it
     # ahead of the injected macros.
     version_line = "#version 420 compatibility"
-    lines = flat.splitlines()
     kept: list[str] = []
 
-    for line in lines:
+    for line in flat.splitlines():
         if line.strip().startswith("#version"):
             version_line = line.strip()
             kept.append("")  # preserve line numbering
             continue
         kept.append(line)
 
-    macro_block = [f"#define {macro}" for macro in iris_macros(target, labpbr=True)]
-    macro_block += [f"#define {d}" for d in defines]
+    kept = apply_option_overrides(kept, settings)
+
+    macro_block = [f"#define {macro}" for macro in iris_macros(target, labpbr)]
 
     body = "\n".join(kept)
     body = _DIRECTIVE_RE.sub("", body)
@@ -201,13 +263,9 @@ def build_translation_unit(entry: Path, target: Target, defines: list[str],
 # ------------------------------------------------------------------------------
 
 
-def resolve_profile(name: str) -> list[str]:
-    """Flatten a profile into concrete `NAME value` / `NAME` define overrides."""
+def resolve_profile(name: str) -> dict[str, str | bool]:
+    """Flatten a profile, including inheritance, into concrete option values."""
     properties = parse_properties(SHADERS_DIR / "shaders.properties")
-
-    options = {}
-    for path in sorted((SHADERS_DIR / "lib").rglob("*.glsl")):
-        options.update(parse_options(path))
 
     settings: dict[str, str | bool] = {}
 
@@ -232,42 +290,31 @@ def resolve_profile(name: str) -> list[str]:
 
     apply(name, ())
 
-    defines: list[str] = []
+    # program.<name> entries toggle whole passes rather than GLSL options, so
+    # they are Iris's business and not the compiler's.
+    return {k: v for k, v in settings.items() if not k.startswith("program.")}
+
+
+def validate_profile_values(settings: dict) -> list[str]:
+    """Check that every value a profile sets actually exists in its option list.
+
+    validate_shader.py performs the same check; repeating it here means a bad
+    value is reported as a configuration error rather than surfacing as a
+    confusing compile failure.
+    """
+    options = {}
+    for path in sorted((SHADERS_DIR / "lib").rglob("*.glsl")):
+        options.update(parse_options(path))
+
+    problems = []
     for key, value in settings.items():
-        if key.startswith("program."):
-            continue
         option = options.get(key)
-        if value is True:
-            defines.append(key)
-        elif value is False:
-            # A disabled boolean must be absent, not defined to 0, because the
-            # shader tests it with #ifdef.
-            continue
-        else:
-            # const options are not #define-able; they are compiled from their
-            # declaration. Only macro options are overridden here.
-            if option is not None and option.kind == "const":
-                continue
-            defines.append(f"{key} {value}")
+        if option is None:
+            problems.append(f"unknown option '{key}'")
+        elif not isinstance(value, bool) and option.values and value not in option.values:
+            problems.append(f"{key}={value} is not one of {option.values}")
 
-    # Booleans the profile turned off still need to be removed from the
-    # defaults in settings.glsl, which glslang would otherwise pick up.
-    undefines = [key for key, value in settings.items()
-                 if value is False and not key.startswith("program.")]
-
-    return defines + [f"__ASTRA_UNDEF_{u}" for u in undefines]
-
-
-def split_defines(raw: list[str]) -> tuple[list[str], list[str]]:
-    """Separate real defines from the undef markers resolve_profile emits."""
-    defines = []
-    undefines = []
-    for item in raw:
-        if item.startswith("__ASTRA_UNDEF_"):
-            undefines.append(item[len("__ASTRA_UNDEF_"):])
-        else:
-            defines.append(item)
-    return defines, undefines
+    return problems
 
 
 # ------------------------------------------------------------------------------
@@ -300,25 +347,14 @@ def find_glslang() -> str | None:
     return None
 
 
-def compile_one(glslang: str, entry: Path, target: Target, preset: str,
-                defines: list[str], undefines: list[str]) -> tuple[bool, str]:
+def compile_one(glslang: str, entry: Path, target: Target, settings: dict,
+                labpbr: bool = True) -> tuple[bool, str]:
     source_map = SourceMap()
 
     try:
-        source = build_translation_unit(entry, target, defines, source_map)
+        source = build_translation_unit(entry, target, settings, source_map, labpbr)
     except RuntimeError as exc:
         return False, str(exc)
-
-    if undefines:
-        # Undefs must follow the macro block but precede the shader body, so
-        # they are spliced in right after the injected defines.
-        lines = source.splitlines()
-        insert_at = 1
-        while insert_at < len(lines) and lines[insert_at].startswith("#define "):
-            insert_at += 1
-        for name in undefines:
-            lines.insert(insert_at, f"#undef {name}")
-        source = "\n".join(lines)
 
     stage = STAGE_FOR_EXTENSION[entry.suffix.lstrip(".")]
 
@@ -416,32 +452,46 @@ def main() -> int:
     total = 0
     failures = 0
 
+    for preset in presets:
+        try:
+            settings = resolve_profile(preset)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}")
+            return 1
+
+        problems = validate_profile_values(settings)
+        if problems:
+            print(f"ERROR: profile {preset} is invalid:")
+            for problem in problems:
+                print(f"  {problem}")
+            return 1
+
+    # Both resource-pack situations are compiled. Without this, the entire
+    # vanilla-fallback branch of lib/material/material.glsl is never seen by a
+    # compiler, because ASTRA_HAS_LABPBR resolves to 1 in every other run.
+    pbr_variants = [(True, "LabPBR"), (False, "vanilla textures")]
+
     for target in TARGETS:
         for preset in presets:
-            try:
-                raw = resolve_profile(preset)
-            except RuntimeError as exc:
-                print(f"ERROR: {exc}")
-                return 1
+            settings = resolve_profile(preset)
 
-            defines, undefines = split_defines(raw)
+            for labpbr, pbr_label in pbr_variants:
+                print(f"\n=== {target.description} / {preset} / {pbr_label} ===")
 
-            print(f"\n=== {target.description} / preset {preset} ===")
+                for entry in entries:
+                    total += 1
+                    ok, message = compile_one(
+                        glslang, entry, target, settings, labpbr
+                    )
 
-            for entry in entries:
-                total += 1
-                ok, message = compile_one(
-                    glslang, entry, target, preset, defines, undefines
-                )
-
-                if ok:
-                    print(f"  ok      {entry.name}")
-                else:
-                    failures += 1
-                    print(f"  FAILED  {entry.name}")
-                    for line in message.splitlines():
-                        if line.strip():
-                            print(f"            {line}")
+                    if ok:
+                        print(f"  ok      {entry.name}")
+                    else:
+                        failures += 1
+                        print(f"  FAILED  {entry.name}")
+                        for line in message.splitlines():
+                            if line.strip():
+                                print(f"            {line}")
 
     print(f"\n{total - failures}/{total} compiled successfully.")
 

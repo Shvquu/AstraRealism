@@ -40,11 +40,23 @@ MAX_COLORTEX = 15
 
 
 class Report:
-    """Collects problems and prints them grouped by severity."""
+    """Collects problems and prints them grouped by severity.
+
+    Three levels, because they mean genuinely different things:
+
+      error   the pack is wrong and will misbehave
+      warn    probably a mistake; --strict promotes these to failures
+      note    known, tracked and deliberate - never fails, even under --strict
+
+    The `note` level exists so that work scheduled for a later phase can be
+    reported on every run without making --strict useless. A warning that is
+    always present is a warning everyone learns to ignore.
+    """
 
     def __init__(self) -> None:
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self.notes: list[str] = []
 
     def error(self, message: str) -> None:
         self.errors.append(message)
@@ -52,21 +64,33 @@ class Report:
     def warn(self, message: str) -> None:
         self.warnings.append(message)
 
-    def print_summary(self, strict: bool) -> int:
+    def note(self, message: str) -> None:
+        self.notes.append(message)
+
+    def print_summary(self, strict: bool, show_notes: bool) -> int:
         for message in self.errors:
             print(f"  ERROR   {message}")
         for message in self.warnings:
             print(f"  WARN    {message}")
 
+        if show_notes:
+            for message in self.notes:
+                print(f"  note    {message}")
+
         failed = bool(self.errors) or (strict and bool(self.warnings))
 
         print()
+        summary = (
+            f"{len(self.errors)} error(s), {len(self.warnings)} warning(s), "
+            f"{len(self.notes)} note(s)"
+        )
+
         if failed:
-            print(
-                f"FAILED: {len(self.errors)} error(s), {len(self.warnings)} warning(s)"
-            )
+            print(f"FAILED: {summary}")
         else:
-            print(f"OK: 0 errors, {len(self.warnings)} warning(s)")
+            print(f"OK: {summary}")
+            if self.notes and not show_notes:
+                print("       run with --notes to list the notes")
 
         return 1 if failed else 0
 
@@ -514,7 +538,139 @@ def check_option_consistency(report: Report) -> None:
         if f"profile.{profile}" not in lang:
             report.warn(f"en_us.lang: missing 'profile.{profile}'")
 
-    # --- orphan language keys --------------------------------------------
+    check_option_usage(report, options)
+    check_orphan_lang_keys(report, options, lang, declared_screens, profile_names)
+
+
+# Options whose implementing pass has not been written yet.
+#
+# They are declared now so the settings screen, the presets and the
+# translations are laid out once rather than churning every phase. Listing them
+# here is what keeps that from turning into an excuse: an option missing from
+# this set and unread is an error, and an option in this set that HAS become
+# used is also an error, so the list can only shrink.
+PENDING_OPTIONS: dict[str, str] = {
+    # Phase 2 - materials, ambient occlusion, reflections, water, wetness
+    "AO_SAMPLES": "phase 2",
+    "AO_RADIUS": "phase 2",
+    "POM_DEPTH": "phase 2",
+    "POM_STEPS": "phase 2",
+    "POM_DISTANCE": "phase 2",
+    "SNOW_MATERIAL": "phase 2",
+    "WETNESS_STRENGTH": "phase 2",
+    "PUDDLE_SIZE": "phase 2",
+    "SSR_STEPS": "phase 2",
+    "SSR_REFINE_STEPS": "phase 2",
+    "SSR_THICKNESS": "phase 2",
+    "SSR_ROUGHNESS_CUTOFF": "phase 2",
+    "SSR_ROUGH_SAMPLES": "phase 2",
+    "WATER_WAVE_HEIGHT": "phase 2",
+    "WATER_WAVE_SPEED": "phase 2",
+    "WATER_WAVE_OCTAVES": "phase 2",
+    "WATER_REFRACTION_STRENGTH": "phase 2",
+    "WATER_CAUSTICS_STRENGTH": "phase 2",
+    "WATER_CAUSTICS_SAMPLES": "phase 2",
+    "WATER_FOAM": "phase 2",
+    "WATER_FOAM_DISTANCE": "phase 2",
+
+    # Phase 3 - global illumination, volumetrics, clouds
+    "GI_SAMPLES": "phase 3",
+    "GI_STEPS": "phase 3",
+    "GI_RADIUS": "phase 3",
+    "GI_RESOLUTION_DIVISOR": "phase 3",
+    "GI_TEMPORAL_FRAMES": "phase 3",
+    "GI_DENOISER_PASSES": "phase 3",
+    "VL_STEPS": "phase 3",
+    "VL_STRENGTH": "phase 3",
+    "VL_RESOLUTION_DIVISOR": "phase 3",
+    "VL_ANISOTROPY": "phase 3",
+    "CLOUD_STEPS": "phase 3",
+    "CLOUD_LIGHT_STEPS": "phase 3",
+    "CLOUD_DENSITY": "phase 3",
+    "CLOUD_COVERAGE": "phase 3",
+    "CLOUD_SPEED": "phase 3",
+    "CLOUD_ALTITUDE": "phase 3",
+    "CLOUD_THICKNESS": "phase 3",
+    "CLOUD_RESOLUTION_DIVISOR": "phase 3",
+
+    # Phase 4 - temporal anti-aliasing, bloom, exposure, lens effects
+    "TAA_STRENGTH": "phase 4",
+    "TAA_SHARPEN": "phase 4",
+    "BLOOM_STRENGTH": "phase 4",
+    "BLOOM_RADIUS": "phase 4",
+    "BLOOM_MIPS": "phase 4",
+    "EXPOSURE_SPEED_UP": "phase 4",
+    "EXPOSURE_SPEED_DOWN": "phase 4",
+    "EXPOSURE_MIN": "phase 4",
+    "EXPOSURE_MAX": "phase 4",
+    "EXPOSURE_LOW_PERCENT": "phase 4",
+    "EXPOSURE_HIGH_PERCENT": "phase 4",
+    "DOF_SAMPLES": "phase 4",
+    "DOF_FOCUS_MODE": "phase 4",
+    "DOF_FOCUS_DISTANCE": "phase 4",
+    "DOF_FOCAL_LENGTH": "phase 4",
+    "DOF_APERTURE": "phase 4",
+    "DOF_FOCUS_SPEED": "phase 4",
+    "MOTION_BLUR_STRENGTH": "phase 4",
+    "CA_STRENGTH": "phase 4",
+    "GRAIN_STRENGTH": "phase 4",
+    "LENS_FLARE_STRENGTH": "phase 4",
+    "LENS_DIRT_STRENGTH": "phase 4",
+}
+
+
+def check_option_usage(report: Report, options: dict) -> None:
+    """Every option must be read by some shader, or be a known pending one.
+
+    An option can be declared, laid out on a screen, translated and set by all
+    six presets while no shader ever reads it. Nothing fails and no warning
+    appears - the setting simply does nothing, which is worse for a user than
+    it not existing.
+    """
+    settings_file = SHADERS_DIR / "lib" / "common" / "settings.glsl"
+
+    sources = [
+        path.read_text(encoding="utf-8")
+        for path in sorted(SHADERS_DIR.rglob("*.glsl"))
+        if path != settings_file
+    ]
+    combined = "\n".join(sources)
+
+    used = {
+        name for name in options
+        if re.search(rf"\b{re.escape(name)}\b", combined)
+    }
+
+    for name in sorted(options):
+        if name in used:
+            # An option that has been implemented must leave the pending list,
+            # otherwise the list stops describing reality.
+            if name in PENDING_OPTIONS:
+                report.error(
+                    f"option '{name}' is now implemented but is still listed in "
+                    f"PENDING_OPTIONS ({PENDING_OPTIONS[name]}); remove it"
+                )
+            continue
+
+        if name in PENDING_OPTIONS:
+            report.note(
+                f"option '{name}' has no effect yet ({PENDING_OPTIONS[name]})"
+            )
+        else:
+            report.error(
+                f"option '{name}' is exposed to users but never read by any "
+                f"shader, so changing it has no effect"
+            )
+
+    for name in sorted(set(PENDING_OPTIONS) - set(options)):
+        report.error(
+            f"PENDING_OPTIONS lists '{name}', which is not a declared option"
+        )
+
+def check_orphan_lang_keys(report: Report, options: dict, lang: dict,
+                           declared_screens: set, profile_names: set) -> None:
+    """Report translations left behind after the thing they described was
+    renamed or removed."""
     known_prefixes = ("option.", "comment.", "value.", "screen.", "profile.",
                       "prefix.", "suffix.")
 
@@ -679,6 +835,10 @@ def main() -> int:
     parser.add_argument(
         "--strict", action="store_true", help="treat warnings as failures"
     )
+    parser.add_argument(
+        "--notes", action="store_true",
+        help="list tracked notes, such as options awaiting a later phase",
+    )
     args = parser.parse_args()
 
     report = Report()
@@ -696,7 +856,7 @@ def main() -> int:
     check_dimensions(report)
     check_glsl_hygiene(report)
 
-    return report.print_summary(args.strict)
+    return report.print_summary(args.strict, args.notes)
 
 
 if __name__ == "__main__":

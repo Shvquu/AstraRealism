@@ -25,7 +25,13 @@
 //==============================================================================
 
 #define SUN_INTENSITY 22.0 // [4.0 8.0 12.0 16.0 18.0 20.0 22.0 24.0 28.0 32.0 40.0 50.0]
-#define MOON_INTENSITY 0.55 // [0.0 0.1 0.25 0.4 0.55 0.7 1.0 1.5 2.0]
+/*
+ * Real moonlight is around 400,000x dimmer than sunlight. Reproducing that
+ * ratio at a fixed exposure leaves nights unplayably black, so the default
+ * compresses it to roughly 15:1 - which is also close to how dark-adapted
+ * vision actually perceives a full moon.
+ */
+#define MOON_INTENSITY 1.5 // [0.0 0.1 0.25 0.4 0.55 0.7 1.0 1.5 2.0 3.0 4.0]
 #define SKYLIGHT_INTENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
 #define BLOCKLIGHT_INTENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0]
 
@@ -254,9 +260,24 @@ const float shadowDistortionFactor = 0.85; // [0.50 0.60 0.70 0.80 0.85 0.90 0.9
 // EXPOSURE
 //==============================================================================
 
-// 0 = manual, 1 = automatic (histogram-based eye adaptation)
-#define EXPOSURE_MODE 1 // [0 1]
-#define MANUAL_EXPOSURE 1.0 // [0.05 0.1 0.25 0.5 0.75 1.0 1.5 2.0 4.0 8.0]
+/*
+ * 0 = manual, 1 = automatic (histogram-based eye adaptation)
+ *
+ * Defaults to manual because the automatic metering pass is not implemented
+ * yet. Selecting Automatic currently behaves as Manual rather than doing
+ * nothing visible - see docs/limitations.md.
+ */
+#define EXPOSURE_MODE 0 // [0 1]
+
+/*
+ * Scene radiance is in physical-ish units: SUN_INTENSITY is a radiance value,
+ * not a screen brightness. A mid-grey surface (albedo 0.18) in full sun reaches
+ * roughly 1.1 before exposure, which ACES would push close to white.
+ *
+ * 0.25 brings that back to a well-exposed midtone. It is calibrated for
+ * daylight, so nights are correspondingly dark until automatic exposure lands.
+ */
+#define MANUAL_EXPOSURE 0.25 // [0.05 0.1 0.15 0.2 0.25 0.35 0.5 0.75 1.0 1.5 2.0 4.0 8.0]
 
 #define EXPOSURE_SPEED_UP 2.5 // [0.5 1.0 1.5 2.0 2.5 3.5 5.0 8.0]
 #define EXPOSURE_SPEED_DOWN 1.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 5.0]

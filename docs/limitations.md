@@ -174,3 +174,26 @@ if one escapes the comment.
 
 **What you will see.** Nothing — this is recorded because it is an easy mistake
 to reintroduce when editing the buffer layout.
+
+---
+
+## 11. Automatic exposure is not implemented yet
+
+**Status.** Phase 4. Until then, **Exposure Mode** defaults to Manual, and
+selecting Automatic behaves as Manual rather than doing nothing visible.
+
+**Why it matters more than it sounds.** Scene radiance in this pack is in
+physical-ish units — `SUN_INTENSITY` is a radiance value, not a screen
+brightness. A single fixed exposure therefore cannot suit both a sunlit field
+and a moonlit one, because the real ratio between them is enormous.
+
+**What we do instead.** `MANUAL_EXPOSURE` defaults to 0.25, calibrated so a
+mid-grey surface (albedo 0.18) in full daylight lands on a well-exposed midtone.
+`MOON_INTENSITY` is compressed to roughly a 15:1 ratio against the sun rather
+than the physical 400,000:1, which is also close to how dark-adapted vision
+actually perceives a full moon.
+
+**What you will see.** Daylight is correctly exposed. Nights are dark — playable,
+but darker than they will be once the eye-adaptation pass exists. Raising
+**Post Processing → Exposure → Manual Exposure** is the immediate workaround, at
+the cost of overexposing daytime.

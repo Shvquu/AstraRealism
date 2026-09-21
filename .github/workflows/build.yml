@@ -1,0 +1,61 @@
+name: Build
+
+# Produces a downloadable pack for every push to main, so a change can be tested
+# in-game without waiting for a tagged release.
+#
+# Validation is delegated to validate.yml rather than repeated here; if it
+# fails, the build job never runs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate.yml
+
+  build:
+    name: Build development pack
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Development builds are labelled with the short commit SHA so a tester
+      # can always say exactly which build they are running.
+      - name: Determine development version
+        id: version
+        run: echo "value=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Write version into pack metadata
+        run: python tools/bump_version.py --version dev
+
+      - name: Build pack
+        run: |
+          python tools/build_pack.py \
+            --version "${{ steps.version.outputs.value }}" \
+            --also-latest
+
+      - name: Upload pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstraRealism-${{ steps.version.outputs.value }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30

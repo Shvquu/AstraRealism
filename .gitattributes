@@ -1,0 +1,33 @@
+# Normalise line endings to LF everywhere.
+#
+# This is not cosmetic. tools/build_pack.py hashes raw file bytes to produce a
+# reproducible archive, so a file checked out as CRLF on Windows and LF on the
+# Linux CI runner would yield two different ZIPs from the same commit. Forcing
+# LF in the working tree keeps local and CI builds byte-identical.
+
+* text=auto eol=lf
+
+# Shader sources
+*.glsl  text eol=lf
+*.vsh   text eol=lf
+*.fsh   text eol=lf
+*.gsh   text eol=lf
+*.csh   text eol=lf
+*.tcs   text eol=lf
+*.tes   text eol=lf
+
+# Pack configuration
+*.properties text eol=lf
+*.lang       text eol=lf
+
+# Tooling and docs
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+
+# Binary assets, should they ever be added
+*.png binary
+*.jpg binary
+*.zip binary

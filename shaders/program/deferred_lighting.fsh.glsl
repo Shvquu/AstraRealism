@@ -1,0 +1,70 @@
+#ifndef ASTRA_DEFERRED_LIGHTING_FSH
+#define ASTRA_DEFERRED_LIGHTING_FSH
+
+/*
+ * AstraRealism - Deferred lighting.
+ *
+ * Runs after all opaque geometry and before translucents. Reads the gbuffer,
+ * shades every opaque pixel, and fills sky pixels with the atmosphere model.
+ *
+ * Doing this deferred rather than in the geometry pass means each pixel is lit
+ * exactly once no matter how much overdraw the terrain had, and it gives later
+ * passes a complete set of material properties to work from.
+ */
+
+#include "/lib/common/common.glsl"
+#include "/lib/lighting/composition.glsl"
+#include "/lib/atmosphere/scattering.glsl"
+#include "/lib/atmosphere/sky.glsl"
+
+in vec2 texcoord;
+
+/* RENDERTARGETS: 0 */
+layout(location = 0) out vec4 sceneColor;
+
+void main() {
+    float depth = texture(depthtex0, texcoord).r;
+
+    //--------------------------------------------------------------------------
+    // Sky
+    //--------------------------------------------------------------------------
+
+    if (isSky(depth)) {
+        vec3 rayDir = viewRayFromUV(texcoord);
+        sceneColor = vec4(renderSky(rayDir), 1.0);
+        return;
+    }
+
+    //--------------------------------------------------------------------------
+    // Opaque surfaces
+    //--------------------------------------------------------------------------
+
+    GBufferData g = decodeGBuffer(
+        texture(colortex1, texcoord),
+        texture(colortex2, texcoord),
+        texture(colortex3, texcoord),
+        texture(colortex4, texcoord)
+    );
+
+    vec3 viewPos = screenToView(vec3(texcoord, depth));
+    vec3 scenePos = viewToScene(viewPos);
+
+    LightingInputs surface;
+    surface.albedo = g.albedo;
+    surface.normal = g.normal;
+    surface.geoNormal = g.geoNormal;
+    surface.scenePos = scenePos;
+    surface.roughness = g.roughness;
+    surface.f0Encoded = g.f0;
+    surface.emissive = g.emissive;
+    surface.porosity = g.porosity;
+    surface.lightmap = g.lightmap;
+    surface.ao = g.ao;
+    surface.materialId = g.materialId;
+    surface.indirect = vec3(0.0);
+    surface.dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
+
+    sceneColor = vec4(computeLighting(surface), 1.0);
+}
+
+#endif // ASTRA_DEFERRED_LIGHTING_FSH

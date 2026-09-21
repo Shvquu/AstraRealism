@@ -1,0 +1,558 @@
+# ==============================================================================
+# AstraRealism - English (US)
+#
+# Keys:
+#   screen.X    title of a settings sub-screen
+#   profile.X   name of a quality preset
+#   option.X    label for an option
+#   comment.X   tooltip shown on hover
+#   value.X.v   label for a specific enum value
+#   suffix.X    unit appended to the displayed value
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Screens
+# ------------------------------------------------------------------------------
+screen.LIGHTING=Lighting
+screen.SHADOWS=Shadows
+screen.GI_AO=Global Illumination & AO
+screen.REFLECTIONS=Reflections
+screen.MATERIALS=Materials & Surfaces
+screen.WATER=Water
+screen.ATMOSPHERE=Atmosphere & Fog
+screen.CLOUDS=Clouds
+screen.POST=Post Processing
+screen.ANTIALIASING=Anti-Aliasing
+screen.BLOOM=Bloom
+screen.EXPOSURE=Exposure
+screen.COLOR=Tone Mapping & Color
+screen.DOF_MOTION=Depth of Field & Motion
+screen.LENS=Lens Effects
+screen.DEBUG=Debug
+
+# ------------------------------------------------------------------------------
+# Profiles
+# ------------------------------------------------------------------------------
+profile.POTATO=Potato
+profile.LOW=Low
+profile.MEDIUM=Medium
+profile.HIGH=High
+profile.ULTRA=Ultra
+profile.CINEMATIC=Cinematic
+
+# ------------------------------------------------------------------------------
+# Lighting
+# ------------------------------------------------------------------------------
+option.SUN_INTENSITY=Sun Intensity
+comment.SUN_INTENSITY=Radiance of direct sunlight before atmospheric extinction. Auto-exposure compensates for most of a change here, so raising it mainly increases contrast between lit and shadowed surfaces rather than overall brightness.
+
+option.MOON_INTENSITY=Moon Intensity
+comment.MOON_INTENSITY=Brightness of direct moonlight. Real moonlight is roughly 400,000x dimmer than sunlight; the default is far above that because a physically exact value would leave nights unplayable.
+
+option.SKYLIGHT_INTENSITY=Skylight Intensity
+comment.SKYLIGHT_INTENSITY=Strength of indirect light scattered from the sky dome. This is what fills in shadowed areas outdoors and gives them their blue cast.
+
+option.AMBIENT_INTENSITY=Ambient Intensity
+comment.AMBIENT_INTENSITY=Uniform fallback light applied everywhere. Keep this low: it is not physically motivated and high values flatten the image. Global Illumination is the realistic way to fill shadows.
+
+option.BLOCKLIGHT_INTENSITY=Block Light Intensity
+comment.BLOCKLIGHT_INTENSITY=Brightness of torches, lanterns and other light-emitting blocks.
+
+option.BLOCKLIGHT_TEMPERATURE=Block Light Temperature
+comment.BLOCKLIGHT_TEMPERATURE=Color temperature of block light. 1900K is a candle flame, 2700K a warm bulb, 6500K neutral daylight. Lower values look more like fire.
+suffix.BLOCKLIGHT_TEMPERATURE= K
+
+option.BLOCKLIGHT_FALLOFF=Block Light Falloff
+comment.BLOCKLIGHT_FALLOFF=How quickly block light fades with distance. Higher values concentrate light near the source, which reads as more realistic but leaves rooms darker.
+
+option.EMISSIVE_INTENSITY=Emissive Intensity
+comment.EMISSIVE_INTENSITY=Brightness multiplier for self-illuminating surfaces such as glowstone, lava and sea lanterns.
+
+option.MINIMUM_LIGHT=Minimum Light
+comment.MINIMUM_LIGHT=Light floor so unlit caves stay readable instead of going pure black. Raise it if you find caves too dark, lower it for a harsher look.
+
+# ------------------------------------------------------------------------------
+# Shadows
+# ------------------------------------------------------------------------------
+option.SHADOWS_ENABLED=Shadows
+comment.SHADOWS_ENABLED=Master switch for the shadow pass. Disabling it also disables volumetric light, which needs the shadow map to know where rays are occluded.
+
+option.shadowMapResolution=Shadow Resolution
+comment.shadowMapResolution=Resolution of the shadow map. The single largest quality lever and a significant cost. 2048 is a good balance; 4096 and above are for high-end GPUs.
+
+option.shadowDistance=Shadow Distance
+comment.shadowDistance=How far from the camera shadows are rendered. Increasing this spreads the same number of texels over a larger area, so raise the resolution alongside it.
+suffix.shadowDistance= blocks
+
+option.shadowDistortionFactor=Shadow Distortion
+comment.shadowDistortionFactor=Concentrates shadow map texels near the camera. Higher values sharpen nearby shadows at the cost of precision further out.
+
+option.SHADOW_BIAS=Shadow Bias
+comment.SHADOW_BIAS=Offset applied when comparing shadow depth. Too low causes shadow acne (striped self-shadowing), too high causes peter-panning (shadows detaching from their caster).
+
+option.SHADOW_FILTER=Shadow Filter
+comment.SHADOW_FILTER=Hard gives crisp aliased edges. PCF blurs by a fixed radius. PCSS varies the blur with the distance between caster and receiver, so contact points stay sharp while distant shadows soften - the physically correct behaviour.
+value.SHADOW_FILTER.0=Hard
+value.SHADOW_FILTER.1=PCF
+value.SHADOW_FILTER.2=PCSS
+
+option.SHADOW_SAMPLES=Shadow Samples
+comment.SHADOW_SAMPLES=Number of shadow map taps per pixel. More samples mean smoother penumbras and less noise.
+
+option.SHADOW_BLOCKER_SAMPLES=Blocker Search Samples
+comment.SHADOW_BLOCKER_SAMPLES=Taps used by PCSS to estimate how far away the occluder is. Only used when the filter is set to PCSS.
+
+option.SUN_ANGULAR_RADIUS=Sun Angular Size
+comment.SUN_ANGULAR_RADIUS=Apparent size of the sun in degrees, which determines how quickly shadows soften with distance. The real sun is about 0.53 degrees; larger values give a softer, more overcast look.
+
+option.COLORED_SHADOWS=Colored Shadows
+comment.COLORED_SHADOWS=Light passing through stained glass, water and ice picks up its color instead of being blocked outright.
+
+option.CONTACT_SHADOWS=Contact Shadows
+comment.CONTACT_SHADOWS=Short screen-space ray march that recovers fine shadow detail the shadow map is too coarse to resolve, such as the gap under a slab.
+
+option.CONTACT_SHADOW_STEPS=Contact Shadow Steps
+comment.CONTACT_SHADOW_STEPS=Ray march steps for contact shadows. More steps reduce banding on curved surfaces.
+
+option.CONTACT_SHADOW_LENGTH=Contact Shadow Length
+comment.CONTACT_SHADOW_LENGTH=How far the contact shadow ray travels, in blocks.
+
+# ------------------------------------------------------------------------------
+# Global illumination and ambient occlusion
+# ------------------------------------------------------------------------------
+option.GI_ENABLED=Global Illumination
+comment.GI_ENABLED=Screen-space indirect lighting: surfaces bounce light onto nearby surfaces, so a torch lights the whole corner of a room rather than just the block it touches. One of the more expensive features.
+
+option.GI_STRENGTH=GI Strength
+comment.GI_STRENGTH=Intensity of indirect bounce light.
+
+option.GI_RADIUS=GI Radius
+comment.GI_RADIUS=World-space distance over which light can bounce, in blocks. Larger radii spread light further but sample the screen more sparsely.
+
+option.GI_SAMPLES=GI Samples
+comment.GI_SAMPLES=Rays traced per pixel per frame. Combined with temporal accumulation, low values still converge - they just take more frames.
+
+option.GI_STEPS=GI Ray Steps
+comment.GI_STEPS=Steps per GI ray. Higher values find occluders more reliably and reduce light leaking.
+
+option.GI_RESOLUTION_DIVISOR=GI Resolution
+comment.GI_RESOLUTION_DIVISOR=Renders GI at a fraction of screen resolution. 2 means half resolution, which costs about a quarter as much. Indirect light is low-frequency, so the upsample is rarely visible.
+
+option.GI_TEMPORAL_FRAMES=GI Temporal Frames
+comment.GI_TEMPORAL_FRAMES=How many frames of history to blend. Higher values are cleaner but make lighting lag behind fast changes.
+
+option.GI_DENOISER=GI Denoiser
+comment.GI_DENOISER=Variance-guided spatial filter that removes the remaining noise from the GI trace. Strongly recommended.
+
+option.GI_DENOISER_PASSES=Denoiser Passes
+comment.GI_DENOISER_PASSES=Number of a-trous filter iterations. Each pass doubles the effective blur radius.
+
+option.AO_MODE=Ambient Occlusion
+comment.AO_MODE=Darkens creases and contact points where ambient light cannot reach. GTAO is ground-truth-based and noticeably more accurate than classic SSAO for a modest extra cost.
+value.AO_MODE.0=Off
+value.AO_MODE.1=SSAO
+value.AO_MODE.2=GTAO
+
+option.AO_STRENGTH=AO Strength
+comment.AO_STRENGTH=Intensity of ambient occlusion. Values above 1.0 exaggerate the effect beyond what is physically correct.
+
+option.AO_SAMPLES=AO Samples
+comment.AO_SAMPLES=Samples per pixel for ambient occlusion.
+
+option.AO_RADIUS=AO Radius
+comment.AO_RADIUS=World-space radius searched for occluders, in blocks.
+
+# ------------------------------------------------------------------------------
+# Reflections
+# ------------------------------------------------------------------------------
+option.SSR_ENABLED=Screen Space Reflections
+comment.SSR_ENABLED=Reflects on-screen geometry in water, glass, metal and wet surfaces. Anything off-screen falls back to the sky and cloud model.
+
+option.SSR_STEPS=Reflection Steps
+comment.SSR_STEPS=Ray march steps per reflection ray. Higher values let reflections reach further before giving up.
+
+option.SSR_REFINE_STEPS=Refinement Steps
+comment.SSR_REFINE_STEPS=Binary search iterations run after a hit is found, which sharpens the intersection point and reduces the stair-stepping artifact along reflected edges.
+
+option.SSR_THICKNESS=Surface Thickness
+comment.SSR_THICKNESS=Assumed depth of on-screen geometry. Too small makes rays pass through thin objects, too large makes them collide with empty space behind foreground objects.
+
+option.SSR_ROUGHNESS_CUTOFF=Roughness Cutoff
+comment.SSR_ROUGHNESS_CUTOFF=Surfaces rougher than this skip reflection tracing entirely. Their reflections would be blurred into near-uniform ambient anyway, so this saves time with little visual cost.
+
+option.SSR_ROUGH_REFLECTIONS=Rough Reflections
+comment.SSR_ROUGH_REFLECTIONS=Blurs reflections on rough surfaces by cone tracing, instead of treating every surface as a perfect mirror.
+
+option.SSR_ROUGH_SAMPLES=Rough Reflection Samples
+comment.SSR_ROUGH_SAMPLES=Rays traced per pixel for rough reflections.
+
+option.SSR_TEMPORAL=Temporal Reflections
+comment.SSR_TEMPORAL=Accumulates reflections over multiple frames to cut noise. Can cause slight smearing behind fast-moving objects.
+
+# ------------------------------------------------------------------------------
+# Materials
+# ------------------------------------------------------------------------------
+option.PBR_MODE=PBR Mode
+comment.PBR_MODE=How material properties are obtained. Auto uses LabPBR data when the resource pack provides it and falls back to a heuristic derived from the base texture otherwise.
+value.PBR_MODE.0=Vanilla Heuristic
+value.PBR_MODE.1=Force LabPBR
+value.PBR_MODE.2=Auto
+
+option.NORMAL_MAP_STRENGTH=Normal Map Strength
+comment.NORMAL_MAP_STRENGTH=Intensity of surface normal detail from the resource pack. Requires a PBR resource pack.
+
+option.POM_ENABLED=Parallax Occlusion Mapping
+comment.POM_ENABLED=Gives flat textures real depth by ray marching a height map. Requires a PBR resource pack with height data; automatically disabled without one.
+
+option.POM_SHADOW=Parallax Self-Shadowing
+comment.POM_SHADOW=Parallax surfaces cast shadows onto themselves, which is what makes the depth read as real rather than as a texture trick.
+
+option.POM_DEPTH=Parallax Depth
+comment.POM_DEPTH=How far surfaces appear to recede. Large values look dramatic but break down at grazing angles.
+
+option.POM_STEPS=Parallax Steps
+comment.POM_STEPS=Ray march steps for parallax. Too few causes visible stepping on steep height changes.
+
+option.POM_DISTANCE=Parallax Distance
+comment.POM_DISTANCE=Distance at which parallax fades out, in blocks. Parallax is invisible at range but still costs full price, so keeping this low is nearly free performance.
+
+option.SUBSURFACE_SCATTERING=Subsurface Scattering
+comment.SUBSURFACE_SCATTERING=Light passes through thin translucent materials such as leaves, grass and ice, so they glow when backlit.
+
+option.SSS_STRENGTH=SSS Strength
+comment.SSS_STRENGTH=Amount of light transmitted through subsurface materials.
+
+option.SNOW_MATERIAL=Snow Material Response
+comment.SNOW_MATERIAL=Gives snow its high albedo, soft sheen and strong subsurface response instead of treating it as ordinary terrain.
+
+option.WETNESS_ENABLED=Wet Surfaces
+comment.WETNESS_ENABLED=Rain darkens albedo and lowers roughness, which makes surfaces reflective. This is the physically correct model of a water film, not a color overlay.
+
+option.WETNESS_STRENGTH=Wetness Strength
+comment.WETNESS_STRENGTH=How strongly rain affects surface appearance.
+
+option.PUDDLES=Puddles
+comment.PUDDLES=Noise-driven puddles form on upward-facing surfaces exposed to the sky.
+
+option.PUDDLE_SIZE=Puddle Size
+comment.PUDDLE_SIZE=Scale of the puddle noise pattern.
+
+option.RAIN_RIPPLES=Rain Ripples
+comment.RAIN_RIPPLES=Animated ripple normals on wet horizontal surfaces during rain.
+
+# ------------------------------------------------------------------------------
+# Water
+# ------------------------------------------------------------------------------
+option.WATER_WAVES=Water Waves
+comment.WATER_WAVES=Animated wave displacement and normals on water surfaces.
+
+option.WATER_WAVE_HEIGHT=Wave Height
+comment.WATER_WAVE_HEIGHT=Amplitude of water waves.
+
+option.WATER_WAVE_SPEED=Wave Speed
+comment.WATER_WAVE_SPEED=How fast waves animate.
+
+option.WATER_WAVE_OCTAVES=Wave Detail
+comment.WATER_WAVE_OCTAVES=Number of noise octaves in the wave simulation. More octaves add fine ripples on top of the large swell.
+
+option.WATER_REFRACTION=Refraction
+comment.WATER_REFRACTION=Bends the view of whatever is under the water surface, following Snell's law.
+
+option.WATER_REFRACTION_STRENGTH=Refraction Strength
+comment.WATER_REFRACTION_STRENGTH=Exaggerates or softens the refraction offset.
+
+option.WATER_ABSORPTION_DISTANCE=Water Clarity
+comment.WATER_ABSORPTION_DISTANCE=Distance over which water absorbs light, in blocks. Lower values make water darken and turn blue faster with depth.
+suffix.WATER_ABSORPTION_DISTANCE= blocks
+
+option.WATER_SCATTERING=Water Scattering
+comment.WATER_SCATTERING=Amount of light scattered by particles suspended in the water, which is what gives deep water its glow rather than looking like black glass.
+
+option.WATER_CAUSTICS=Caustics
+comment.WATER_CAUSTICS=Focused light patterns cast onto surfaces beneath the water by the wave surface acting as a lens.
+
+option.WATER_CAUSTICS_STRENGTH=Caustics Strength
+comment.WATER_CAUSTICS_STRENGTH=Brightness of caustic patterns.
+
+option.WATER_CAUSTICS_SAMPLES=Caustics Samples
+comment.WATER_CAUSTICS_SAMPLES=Samples used to estimate light convergence. More samples give smoother caustics.
+
+option.WATER_FOAM=Foam
+comment.WATER_FOAM=White foam where water meets solid geometry.
+
+option.WATER_FOAM_DISTANCE=Foam Width
+comment.WATER_FOAM_DISTANCE=How far foam extends from the shoreline, in blocks.
+
+# ------------------------------------------------------------------------------
+# Atmosphere and fog
+# ------------------------------------------------------------------------------
+option.ATMOSPHERE_STEPS=Atmosphere Quality
+comment.ATMOSPHERE_STEPS=Ray march steps used to build the sky lookup table. Affects sky gradient quality only, not the cost of shading the world.
+
+option.ATMOSPHERE_MULTISCATTER=Multiple Scattering
+comment.ATMOSPHERE_MULTISCATTER=Approximates light that scatters more than once in the atmosphere. Without it the sky near the horizon and the whole of twilight look too dark.
+
+option.STARS_ENABLED=Stars
+comment.STARS_ENABLED=Procedural star field, dimmed by atmospheric scattering and moonlight.
+
+option.STARS_INTENSITY=Star Brightness
+comment.STARS_INTENSITY=Brightness of the star field.
+
+option.FOG_ENABLED=Fog
+comment.FOG_ENABLED=Master switch for all distance and atmospheric fog.
+
+option.FOG_DENSITY=Fog Density
+comment.FOG_DENSITY=Overall thickness of distance fog.
+
+option.HEIGHT_FOG=Height Fog
+comment.HEIGHT_FOG=Fog that pools in valleys and thins with altitude, following an exponential density profile.
+
+option.HEIGHT_FOG_DENSITY=Height Fog Density
+comment.HEIGHT_FOG_DENSITY=Thickness of height fog at its base.
+
+option.HEIGHT_FOG_FALLOFF=Height Fog Falloff
+comment.HEIGHT_FOG_FALLOFF=Altitude over which height fog thins out, in blocks.
+suffix.HEIGHT_FOG_FALLOFF= blocks
+
+option.CAVE_FOG=Cave Fog
+comment.CAVE_FOG=Dense unlit fog underground, which restores the sense of depth that shadow-free caves otherwise lose.
+
+option.CAVE_FOG_DENSITY=Cave Fog Density
+comment.CAVE_FOG_DENSITY=Thickness of cave fog.
+
+option.VOLUMETRIC_LIGHT=Volumetric Light
+comment.VOLUMETRIC_LIGHT=God rays and light shafts, produced by marching the shadow map through the air. Requires shadows to be enabled.
+
+option.VL_STRENGTH=Volumetric Strength
+comment.VL_STRENGTH=Intensity of light shafts.
+
+option.VL_STEPS=Volumetric Steps
+comment.VL_STEPS=Ray march steps for volumetric light. More steps reduce banding, especially when looking toward the sun.
+
+option.VL_RESOLUTION_DIVISOR=Volumetric Resolution
+comment.VL_RESOLUTION_DIVISOR=Renders volumetrics at a fraction of screen resolution. Light shafts are soft, so half resolution is usually indistinguishable.
+
+option.VL_ANISOTROPY=Volumetric Anisotropy
+comment.VL_ANISOTROPY=How strongly light scatters forward. Higher values make rays much brighter when looking toward the sun and dimmer when looking away, which is how real haze behaves.
+
+# ------------------------------------------------------------------------------
+# Clouds
+# ------------------------------------------------------------------------------
+option.CLOUDS_MODE=Cloud Quality
+comment.CLOUDS_MODE=Off removes clouds entirely. 2D draws a flat animated layer and is nearly free. Volumetric ray marches real cloud density with light scattering, and is the most expensive feature in the pack.
+value.CLOUDS_MODE.0=Off
+value.CLOUDS_MODE.1=2D Layer
+value.CLOUDS_MODE.2=Volumetric
+
+option.CLOUD_SHADOWS=Cloud Shadows
+comment.CLOUD_SHADOWS=Clouds darken the ground beneath them and cut volumetric light shafts.
+
+option.CLOUD_DENSITY=Cloud Density
+comment.CLOUD_DENSITY=How opaque clouds are. Denser clouds absorb more light and have darker bases.
+
+option.CLOUD_COVERAGE=Cloud Coverage
+comment.CLOUD_COVERAGE=How much of the sky is covered. Rain raises this automatically.
+
+option.CLOUD_SPEED=Cloud Speed
+comment.CLOUD_SPEED=How fast clouds drift.
+
+option.CLOUD_ALTITUDE=Cloud Altitude
+comment.CLOUD_ALTITUDE=Height of the cloud layer base, in blocks.
+suffix.CLOUD_ALTITUDE= blocks
+
+option.CLOUD_THICKNESS=Cloud Thickness
+comment.CLOUD_THICKNESS=Vertical extent of the cloud layer, in blocks. Thicker layers cost more to march.
+suffix.CLOUD_THICKNESS= blocks
+
+option.CLOUD_STEPS=Cloud Steps
+comment.CLOUD_STEPS=Ray march steps through the cloud layer. The dominant cost of volumetric clouds.
+
+option.CLOUD_LIGHT_STEPS=Cloud Light Steps
+comment.CLOUD_LIGHT_STEPS=Steps taken toward the sun at each cloud sample to compute self-shadowing. Low values flatten clouds; high values are expensive because the cost multiplies with cloud steps.
+
+option.CLOUD_RESOLUTION_DIVISOR=Cloud Resolution
+comment.CLOUD_RESOLUTION_DIVISOR=Renders clouds at a fraction of screen resolution and reprojects them across frames.
+
+# ------------------------------------------------------------------------------
+# Anti-aliasing
+# ------------------------------------------------------------------------------
+option.AA_MODE=Anti-Aliasing
+comment.AA_MODE=TAA is strongly recommended: several systems in this pack rely on its temporal accumulation to resolve their noise, and they will look grainy without it. FXAA is a cheap spatial alternative with no temporal cost.
+value.AA_MODE.0=Off
+value.AA_MODE.1=FXAA
+value.AA_MODE.2=TAA
+
+option.TAA_STRENGTH=TAA Strength
+comment.TAA_STRENGTH=How much of the previous frame is retained. Higher values are smoother and more stable but increase ghosting behind moving objects.
+
+option.TAA_SHARPEN=TAA Sharpening
+comment.TAA_SHARPEN=Counteracts the softening that temporal blending introduces.
+
+# ------------------------------------------------------------------------------
+# Bloom
+# ------------------------------------------------------------------------------
+option.BLOOM_ENABLED=Bloom
+comment.BLOOM_ENABLED=Energy-conserving glow around bright areas, built from a real downsample and upsample mip chain rather than a single blur.
+
+option.BLOOM_STRENGTH=Bloom Strength
+comment.BLOOM_STRENGTH=How much bloom is mixed into the final image. Small values are correct; large values wash the image out.
+
+option.BLOOM_RADIUS=Bloom Radius
+comment.BLOOM_RADIUS=Spread of the bloom filter during upsampling.
+
+option.BLOOM_MIPS=Bloom Mips
+comment.BLOOM_MIPS=Number of levels in the bloom chain. More levels produce a wider, softer glow.
+
+# ------------------------------------------------------------------------------
+# Exposure
+# ------------------------------------------------------------------------------
+option.EXPOSURE_MODE=Exposure Mode
+comment.EXPOSURE_MODE=Automatic adapts to scene brightness the way an eye does, so walking out of a cave briefly overexposes and then settles. Manual holds a fixed value.
+value.EXPOSURE_MODE.0=Manual
+value.EXPOSURE_MODE.1=Automatic
+
+option.MANUAL_EXPOSURE=Manual Exposure
+comment.MANUAL_EXPOSURE=Fixed exposure value, used only when the mode is Manual.
+
+option.EXPOSURE_SPEED_UP=Adaptation Speed (Brightening)
+comment.EXPOSURE_SPEED_UP=How fast the eye adapts when moving into a brighter scene. Real eyes adapt to light faster than to dark, which is why this defaults higher than the other direction.
+
+option.EXPOSURE_SPEED_DOWN=Adaptation Speed (Darkening)
+comment.EXPOSURE_SPEED_DOWN=How fast the eye adapts when moving into a darker scene.
+
+option.EXPOSURE_MIN=Minimum Exposure
+comment.EXPOSURE_MIN=Lower bound on auto exposure. Prevents very bright scenes from being crushed.
+
+option.EXPOSURE_MAX=Maximum Exposure
+comment.EXPOSURE_MAX=Upper bound on auto exposure. Prevents dark scenes from being amplified into noise.
+
+option.EXPOSURE_LOW_PERCENT=Histogram Low
+comment.EXPOSURE_LOW_PERCENT=Lower percentile of the luminance histogram used for metering. Raising both percentiles biases exposure toward highlights.
+
+option.EXPOSURE_HIGH_PERCENT=Histogram High
+comment.EXPOSURE_HIGH_PERCENT=Upper percentile of the luminance histogram used for metering.
+
+# ------------------------------------------------------------------------------
+# Tone mapping and grading
+# ------------------------------------------------------------------------------
+option.TONEMAP=Tone Mapping
+comment.TONEMAP=Maps high dynamic range light onto a displayable range. ACES is filmic with strong highlight rolloff. AgX preserves hue in very bright areas better than ACES. Neutral is the Khronos PBR standard and is the most faithful to the input. Reinhard is the simplest and flattest.
+value.TONEMAP.0=Reinhard
+value.TONEMAP.1=ACES
+value.TONEMAP.2=AgX
+value.TONEMAP.3=Neutral
+
+option.POST_EXPOSURE=Exposure Offset
+comment.POST_EXPOSURE=Brightness multiplier applied before tone mapping.
+
+option.POST_CONTRAST=Contrast
+comment.POST_CONTRAST=Contrast applied around middle grey.
+
+option.POST_SATURATION=Saturation
+comment.POST_SATURATION=Uniform color intensity. 1.0 leaves the image untouched.
+
+option.POST_VIBRANCE=Vibrance
+comment.POST_VIBRANCE=Boosts muted colors while leaving already-saturated ones alone. Usually looks more natural than raising saturation.
+
+option.POST_GAMMA=Gamma
+comment.POST_GAMMA=Midtone brightness curve. Values below 1.0 deepen shadows.
+
+option.POST_TEMPERATURE=White Balance
+comment.POST_TEMPERATURE=Color temperature of white. Below 6500K warms the image, above cools it.
+suffix.POST_TEMPERATURE= K
+
+option.POST_TINT=Tint
+comment.POST_TINT=Green to magenta shift, perpendicular to the temperature axis.
+
+# ------------------------------------------------------------------------------
+# Depth of field and motion blur
+# ------------------------------------------------------------------------------
+option.DOF_ENABLED=Depth of Field
+comment.DOF_ENABLED=Blurs objects outside the focal plane using a real thin-lens model. Off by default because it fights with gameplay readability.
+
+option.DOF_FOCUS_MODE=Focus Mode
+comment.DOF_FOCUS_MODE=Autofocus tracks whatever is at the centre of the screen. Manual holds a fixed focus distance.
+value.DOF_FOCUS_MODE.0=Autofocus
+value.DOF_FOCUS_MODE.1=Manual
+
+option.DOF_FOCUS_DISTANCE=Focus Distance
+comment.DOF_FOCUS_DISTANCE=Distance to the focal plane in blocks, used only in Manual focus mode.
+suffix.DOF_FOCUS_DISTANCE= blocks
+
+option.DOF_APERTURE=Aperture
+comment.DOF_APERTURE=f-stop of the virtual lens. Lower numbers mean a wider aperture and a shallower depth of field.
+
+option.DOF_FOCAL_LENGTH=Focal Length
+comment.DOF_FOCAL_LENGTH=Focal length in millimetres. Longer lenses compress depth and blur the background more.
+suffix.DOF_FOCAL_LENGTH= mm
+
+option.DOF_SAMPLES=Bokeh Samples
+comment.DOF_SAMPLES=Samples per pixel in the bokeh kernel. Too few produces visible overlapping discs.
+
+option.DOF_FOCUS_SPEED=Focus Speed
+comment.DOF_FOCUS_SPEED=How quickly autofocus racks to a new subject.
+
+option.MOTION_BLUR=Motion Blur
+comment.MOTION_BLUR=Smears the image along screen-space motion vectors. Off by default.
+value.MOTION_BLUR.0=Off
+value.MOTION_BLUR.1=Low
+value.MOTION_BLUR.2=Medium
+value.MOTION_BLUR.3=High
+
+option.MOTION_BLUR_STRENGTH=Motion Blur Strength
+comment.MOTION_BLUR_STRENGTH=Length of the motion blur streak.
+
+# ------------------------------------------------------------------------------
+# Lens effects
+# ------------------------------------------------------------------------------
+option.VIGNETTE=Vignette
+comment.VIGNETTE=Darkens the corners of the frame, mimicking lens falloff.
+
+option.VIGNETTE_STRENGTH=Vignette Strength
+comment.VIGNETTE_STRENGTH=How dark the corners become.
+
+option.CHROMATIC_ABERRATION=Chromatic Aberration
+comment.CHROMATIC_ABERRATION=Splits color channels toward the edges of the frame, as a real lens does. Off by default.
+
+option.CA_STRENGTH=Aberration Strength
+comment.CA_STRENGTH=Magnitude of the channel separation.
+
+option.FILM_GRAIN=Film Grain
+comment.FILM_GRAIN=Adds animated luminance noise. Off by default.
+
+option.GRAIN_STRENGTH=Grain Strength
+comment.GRAIN_STRENGTH=Intensity of the film grain.
+
+option.LENS_FLARE=Lens Flare
+comment.LENS_FLARE=Ghost images and streaks from bright light sources. Off by default.
+
+option.LENS_FLARE_STRENGTH=Lens Flare Strength
+comment.LENS_FLARE_STRENGTH=Brightness of lens flare artifacts.
+
+option.LENS_DIRT=Lens Dirt
+comment.LENS_DIRT=Modulates bloom with a procedural dirt pattern, as though the lens were smudged. Off by default.
+
+option.LENS_DIRT_STRENGTH=Lens Dirt Strength
+comment.LENS_DIRT_STRENGTH=Visibility of the lens dirt pattern.
+
+# ------------------------------------------------------------------------------
+# Debug
+# ------------------------------------------------------------------------------
+option.DEBUG_MODE=Debug View
+comment.DEBUG_MODE=Replaces the final image with a single intermediate buffer. Intended for development and for reporting rendering bugs.
+value.DEBUG_MODE.0=Off
+value.DEBUG_MODE.1=Albedo
+value.DEBUG_MODE.2=Normals
+value.DEBUG_MODE.3=Depth
+value.DEBUG_MODE.4=Roughness
+value.DEBUG_MODE.5=Metallic / F0
+value.DEBUG_MODE.6=Emissive
+value.DEBUG_MODE.7=Lightmap
+value.DEBUG_MODE.8=Ambient Occlusion
+value.DEBUG_MODE.9=Shadows
+value.DEBUG_MODE.10=Direct Lighting
+value.DEBUG_MODE.11=Global Illumination
+value.DEBUG_MODE.12=Reflections
+value.DEBUG_MODE.13=Volumetrics
+value.DEBUG_MODE.14=Motion Vectors
+value.DEBUG_MODE.15=Material ID

@@ -145,8 +145,18 @@ PROGRAMS: tuple[Program, ...] = (
     ),
 
     # --- deferred ------------------------------------------------------------
-    _composite("deferred", "deferred_lighting", "PROGRAM_DEFERRED_LIGHTING",
+    #
+    # Order is fixed and load-bearing:
+    #   deferred   ambient occlusion, written into the gbuffer
+    #   deferred1  lighting, which consumes that occlusion
+    #   deferred2  reflections, which need the lit scene, plus the copy of it
+    #              that translucent geometry reads
+    _composite("deferred", "deferred_ao", "PROGRAM_DEFERRED_AO",
+               "screen-space ambient occlusion, folded into the gbuffer"),
+    _composite("deferred1", "deferred_lighting", "PROGRAM_DEFERRED_LIGHTING",
                "opaque deferred lighting composition"),
+    _composite("deferred2", "deferred_reflections", "PROGRAM_DEFERRED_REFLECTIONS",
+               "screen-space reflections and the scene copy for translucents"),
 
     # --- composite -----------------------------------------------------------
     _composite("composite", "composite_scene", "PROGRAM_COMPOSITE_SCENE",

@@ -49,12 +49,12 @@ vec3 renderStars(vec3 rayDir) {
 
     // Position within the cell, so stars are not on a visible lattice.
     vec2 offset = (random.yz - 0.5) * 0.7;
-    float distance = length(local.xy - offset);
+    float discDistance = length(local.xy - offset);
 
     // Star brightness follows a steep distribution: many faint, few bright.
     float magnitude = pow(fract(random.x * 71.0), 3.0);
 
-    float intensity = smoothstep(0.09, 0.0, distance) * magnitude;
+    float intensity = smoothstep(0.09, 0.0, discDistance) * magnitude;
 
     /*
      * Colour by temperature. Real stars run from cool red dwarfs to hot blue
@@ -94,7 +94,7 @@ vec3 renderSunDisc(vec3 rayDir) {
 
     if (cosAngle < cosRadius) return vec3(0.0);
 
-    // Normalised distance from the centre of the disc, 0 to 1.
+    // Normalised discDistance from the centre of the disc, 0 to 1.
     float angle = acos(clamp(cosAngle, -1.0, 1.0));
     float r = saturate(angle / angularRadius);
 

@@ -12,6 +12,7 @@
 
 #include "/lib/common/common.glsl"
 #include "/lib/material/material_id.glsl"
+#include "/lib/water/waves.glsl"
 
 //==============================================================================
 // VERTEX ATTRIBUTES
@@ -54,11 +55,24 @@ flat out int materialId;
 // Tile bounds in atlas space, used by parallax to wrap UVs inside the sprite.
 out vec2 midTexcoord;
 
+/*
+ * Size of this fragment's sprite within the atlas.
+ *
+ * Every vertex of a quad sits on a corner of its tile, so the distance from the
+ * tile centre to any vertex is half the tile size - which makes this expression
+ * exact and identical at all four vertices. `flat` because it must not be
+ * interpolated: parallax uses it to wrap marched coordinates back inside the
+ * sprite, and an interpolated value would let the march walk into the
+ * neighbouring texture.
+ */
+flat out vec2 tileSize;
+
 //==============================================================================
 
 void main() {
     texcoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
     midTexcoord = mc_midTexCoord;
+    tileSize = abs(texcoord - mc_midTexCoord) * 2.0;
 
     // The lightmap arrives in [0,255] and its texture matrix maps it to the
     // [0.03125, 0.96875] range the vanilla lightmap texture expects. We want
@@ -79,6 +93,23 @@ void main() {
     bitangent = normalize(cross(tangent, normal) * sign(at_tangent.w));
 
     materialId = classifyMaterial(int(mc_Entity.x + 0.5));
+
+    /*
+     * Wave displacement.
+     *
+     * Applied after the tangent basis is built, because the basis describes the
+     * texture mapping and is unaffected by moving the vertex. The shading
+     * normal comes from the wave field in the fragment stage instead.
+     *
+     * Only upward-facing water moves - see waveDisplacement() for why the side
+     * faces must stay put.
+     */
+    if (materialId == MATID_WATER) {
+        float displacement = waveDisplacement(worldPosition(scenePos), normal);
+
+        scenePos.y += displacement;
+        viewPos = sceneToView(scenePos);
+    }
 
     gl_Position = gl_ProjectionMatrix * vec4(viewPos, 1.0);
 

@@ -550,29 +550,6 @@ def check_option_consistency(report: Report) -> None:
 # this set and unread is an error, and an option in this set that HAS become
 # used is also an error, so the list can only shrink.
 PENDING_OPTIONS: dict[str, str] = {
-    # Phase 2 - materials, ambient occlusion, reflections, water, wetness
-    "AO_SAMPLES": "phase 2",
-    "AO_RADIUS": "phase 2",
-    "POM_DEPTH": "phase 2",
-    "POM_STEPS": "phase 2",
-    "POM_DISTANCE": "phase 2",
-    "SNOW_MATERIAL": "phase 2",
-    "WETNESS_STRENGTH": "phase 2",
-    "PUDDLE_SIZE": "phase 2",
-    "SSR_STEPS": "phase 2",
-    "SSR_REFINE_STEPS": "phase 2",
-    "SSR_THICKNESS": "phase 2",
-    "SSR_ROUGHNESS_CUTOFF": "phase 2",
-    "SSR_ROUGH_SAMPLES": "phase 2",
-    "WATER_WAVE_HEIGHT": "phase 2",
-    "WATER_WAVE_SPEED": "phase 2",
-    "WATER_WAVE_OCTAVES": "phase 2",
-    "WATER_REFRACTION_STRENGTH": "phase 2",
-    "WATER_CAUSTICS_STRENGTH": "phase 2",
-    "WATER_CAUSTICS_SAMPLES": "phase 2",
-    "WATER_FOAM": "phase 2",
-    "WATER_FOAM_DISTANCE": "phase 2",
-
     # Phase 3 - global illumination, volumetrics, clouds
     "GI_SAMPLES": "phase 3",
     "GI_STEPS": "phase 3",
@@ -817,6 +794,24 @@ def check_glsl_hygiene(report: Report) -> None:
                 report.error(
                     f"{rel}:{lineno}: 'texture' collides with the built-in "
                     "texture() function; use gtexture"
+                )
+
+            # Any local declaration named after a built-in function shadows it
+            # for the rest of the scope. `float texture = ...` compiles, and
+            # then the next texture() call in that function fails with a
+            # confusing error about calling a non-function.
+            shadowed = re.match(
+                r"\s*(?:float|int|uint|bool|vec[234]|ivec[234]|mat[234])\s+"
+                r"(texture|textureLod|textureGrad|length|distance|normalize"
+                r"|mix|clamp|step|smoothstep|dot|cross|reflect|refract"
+                r"|fract|mod|pow|exp|log|sqrt)"
+                r"\s*[=;]",
+                line,
+            )
+            if shadowed:
+                report.error(
+                    f"{rel}:{lineno}: local variable '{shadowed.group(1)}' "
+                    f"shadows a GLSL built-in function"
                 )
 
             # texture2D was removed in GLSL 1.40 core and is deprecated in

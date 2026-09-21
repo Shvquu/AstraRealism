@@ -15,15 +15,24 @@ shadow            scene from the light's point of view
    |              -> shadowtex0/1 (depth), shadowcolor0 (translucent tint)
    v
 gbuffers (opaque) terrain, entities, block entities, hand
+   |              parallax displacement, wetness, snow response
    |              -> colortex1..4 (material properties), depthtex
    v
-deferred          shade every opaque pixel; fill sky pixels with the atmosphere
+deferred          ambient occlusion, folded into the gbuffer's AO channel
+   |              -> colortex4
+   v
+deferred1         shade every opaque pixel; fill sky pixels with the atmosphere
    |              -> colortex0 (HDR radiance)
    v
-gbuffers (trans.) water, glass, particles, weather - forward shaded
+deferred2         screen-space reflections, plus the scene copy translucents read
+   |              -> colortex0, colortex8 (history), colortex9 (copy),
+   |                 colortex13 (depth for next frame)
+   v
+gbuffers (trans.) water and glass: waves, refraction, absorption, reflection,
+   |              caustics. particles and weather: forward shaded.
    |              -> colortex0, blended
    v
-composite         atmospheric fog over the complete scene
+composite         atmospheric fog, underwater caustics
    |              -> colortex0
    v
 final             exposure, grading, tone mapping, vignette, dither
@@ -47,6 +56,16 @@ scene must exist first. The consequence is that translucents cannot use the
 gbuffer — the lighting pass has already consumed it — which is why they take the
 forward path in `lib/lighting/forward.glsl`.
 
+**Occlusion before lighting.** The lighting pass consumes the AO channel, so it
+has to be filled first. Writing it back into colortex4 rather than into a buffer
+of its own works because Iris ping-pongs colour attachments: a pass reads the
+front copy and writes the back one.
+
+**Reflections after lighting, before translucents.** Reflections need the scene
+to be lit, so they cannot run earlier. They must not include water, so they
+cannot run later. That leaves exactly one slot, which is also the only correct
+place to copy the opaque scene for translucents to read.
+
 **Fog after translucents.** Fog attenuates everything between the camera and the
 surface, including water and particles. Applying it before they are drawn leaves
 them unfogged and floating in front of the haze.
@@ -61,20 +80,21 @@ and wash the sky out.
 
 | Buffer | Format | Written by | Read by | Clear |
 |---|---|---|---|---|
-| colortex0 | RGBA16F | deferred, forward gbuffers, composite | composite, final | yes |
-| colortex1 | RGBA16 | gbuffers (opaque) | deferred, debug | yes |
-| colortex2 | RGBA16 | gbuffers (opaque) | deferred, debug | yes |
-| colortex3 | RGBA8 | gbuffers (opaque) | deferred, debug | yes |
-| colortex4 | RGBA16F | gbuffers (opaque) | deferred, composite, debug | yes |
+| colortex0 | RGBA16F | deferred1/2, forward gbuffers, composite | composite, final | yes |
+| colortex1 | RGBA16 | gbuffers (opaque) | deferred1/2, debug | yes |
+| colortex2 | RGBA16 | gbuffers (opaque) | deferred, deferred1/2, debug | yes |
+| colortex3 | RGBA8 | gbuffers (opaque) | deferred1/2, debug | yes |
+| colortex4 | RGBA16F | gbuffers (opaque), deferred | deferred1/2, composite, debug | yes |
 | colortex5 | RGBA16F | *planned* TAA resolve | TAA resolve | **no** |
-| colortex6 | RGBA16F | *planned* GI accumulate | deferred, denoiser | **no** |
+| colortex6 | RGBA16F | *planned* GI accumulate | deferred1, denoiser | **no** |
 | colortex7 | RGBA16F | *planned* GI moments | denoiser | **no** |
-| colortex8 | RGBA16F | *planned* SSR accumulate | composite | **no** |
-| colortex9 | RGBA16F | *planned* volumetrics | composite | yes |
-| colortex10 | RGBA16F | *planned* clouds | deferred, composite | **no** |
-| colortex11-12 | RGBA16F | *planned* bloom chain | final | yes |
-| colortex13 | RGBA32F | *planned* previous depth and motion | TAA, GI, SSR | **no** |
-| colortex14 | RGBA16F | *planned* atmosphere LUTs | deferred, composite | **no** |
+| colortex8 | RGBA16F | deferred2 | deferred2 (previous frame) | **no** |
+| colortex9 | RGBA16F | deferred2 | gbuffers_water, gbuffers_hand_water | yes |
+| colortex10 | RGBA16F | *planned* volumetrics | composite | yes |
+| colortex11 | RGBA16F | *planned* clouds | deferred1, composite | **no** |
+| colortex12 | RGBA16F | *planned* bloom chain | final | yes |
+| colortex13 | RGBA32F | deferred2 | deferred2 (previous frame), *planned* TAA/GI | **no** |
+| colortex14 | RGBA16F | *planned* atmosphere LUTs | deferred1, composite | **no** |
 | colortex15 | RGBA32F | *planned* exposure state | final | **no** |
 
 `clear = no` is what makes a buffer temporal: it survives into the next frame so
@@ -120,13 +140,23 @@ pass and is already actionable.
 | Pass | Dominant cost | Scales with |
 |---|---|---|
 | Shadow | Rasterising the scene a second time | Shadow Resolution squared, Shadow Distance |
-| Gbuffers | Overdraw, parallax ray marching | Render distance, Parallax Steps |
-| Deferred | PCSS blocker search plus filtering | Shadow Samples, Blocker Samples |
+| Gbuffers | Overdraw, parallax ray marching | Render distance, Parallax Steps, Parallax Distance |
+| deferred (AO) | Horizon search per slice | AO Samples, and 4 march steps each |
+| deferred1 (lighting) | PCSS blocker search plus filtering | Shadow Samples, Blocker Samples |
+| deferred2 (reflections) | Ray marching per reflective pixel | Reflection Steps x Rough Samples, fraction of screen below the roughness cutoff |
+| gbuffers_water | Wave noise, refraction, caustics | Wave Detail, Caustics Samples — these multiply |
 | GI *(planned)* | Ray marching the depth buffer | GI Samples x GI Steps, divided by GI Resolution squared |
-| Reflections *(planned)* | Ray marching per reflective pixel | Reflection Steps, fraction of screen that is reflective |
 | Volumetrics *(planned)* | Shadow lookups per march step | Volumetric Steps, divided by resolution squared |
 | Clouds *(planned)* | Cloud Steps x Cloud Light Steps per pixel | The product — raising both is multiplicative |
 | Post *(planned)* | Bloom chain, TAA resolve | Screen resolution |
+
+Two rows multiply rather than add, and are worth internalising:
+
+- **Caustics** evaluate the wave field several times per sample, so their cost is
+  `Caustics Samples x Wave Detail`. They only run on pixels seen through or from
+  within water, but on those pixels they are expensive.
+- **Clouds** cost `Cloud Steps x Cloud Light Steps`. Doubling both quadruples the
+  work.
 
 The clouds row is the one worth internalising: cloud cost is the *product* of the
 two step counts, not their sum. Doubling both quadruples the work.

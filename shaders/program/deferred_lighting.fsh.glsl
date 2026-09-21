@@ -20,6 +20,7 @@
 #define ASTRA_HAS_SCENE_DEPTH
 
 #include "/lib/lighting/composition.glsl"
+#include "/lib/lighting/ao.glsl"
 #include "/lib/atmosphere/scattering.glsl"
 #include "/lib/atmosphere/sky.glsl"
 
@@ -65,7 +66,18 @@ void main() {
     surface.emissive = g.emissive;
     surface.porosity = g.porosity;
     surface.lightmap = g.lightmap;
-    surface.ao = g.ao;
+
+    /*
+     * Ambient occlusion is filtered as it is read rather than in a pass of its
+     * own. The bilateral kernel is nine taps either way, and folding it in here
+     * saves a full-screen pass.
+     *
+     * The filter exists because temporal accumulation only arrives with TAA in
+     * a later phase; until then the raw trace is visibly noisy at the sample
+     * counts the lower presets use.
+     */
+    surface.ao = filterAmbientOcclusion(colortex4, texcoord, depth, g.geoNormal);
+
     surface.materialId = g.materialId;
     surface.indirect = vec3(0.0);
     surface.dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);

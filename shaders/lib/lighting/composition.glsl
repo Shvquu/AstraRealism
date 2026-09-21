@@ -142,9 +142,24 @@ vec3 computeLighting(LightingInputs surface) {
         result += surface.albedo * skyLight * occlusion * ASTRA_INV_PI;
     }
 
-    // Rough surfaces still show the sky as a broad sheen; smooth ones get a
-    // proper reflection from the SSR pass instead.
+    /*
+     * Ambient specular from the sky.
+     *
+     * Smooth surfaces get a real reflection from the reflections pass instead,
+     * so they are excluded here. The two are kept mutually exclusive by the
+     * same roughness threshold that pass uses, which is what stops the energy
+     * being counted twice and making every wet or metallic surface too bright.
+     *
+     * Rough surfaces are never traced - their reflection would be blurred into
+     * something indistinguishable from this term anyway - so they keep it.
+     */
+#if ASTRA_ENABLE_SSR
+    if (surface.roughness > SSR_ROUGHNESS_CUTOFF) {
+        result += ambientSpecular(skyLight, f0, ndotv, surface.roughness) * occlusion;
+    }
+#else
     result += ambientSpecular(skyLight, f0, ndotv, surface.roughness) * occlusion;
+#endif
 
     //--------------------------------------------------------------------------
     // Indirect bounce from the GI pass

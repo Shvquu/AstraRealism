@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT
 // Source: tools/gen_dimension_stubs.py + tools/program_manifest.py
-// Program: deferred.vsh  (world1: the end)
+// Program: deferred1.vsh  (world1: the end)
 //
-// screen-space ambient occlusion, folded into the gbuffer
+// opaque deferred lighting composition
 
 #version 420 compatibility
 
 #define DIM_END
-#define PROGRAM_DEFERRED_AO
+#define PROGRAM_DEFERRED_LIGHTING
 
 #include "/program/fullscreen.vsh.glsl"

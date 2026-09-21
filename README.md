@@ -8,9 +8,10 @@ from the angular size of the sun. Wet stone reflects more because rain lowers
 its roughness, not because a blue filter was applied. The goal is an image that
 reads as real while staying unmistakably Minecraft.
 
-> **Status: Phase 1 of 5.** The lighting core, shadows, atmosphere and fog are
-> implemented and compile clean. Materials, reflections, global illumination,
-> volumetrics and the full post-processing chain land in later phases. See
+> **Status: Phase 2 of 5.** Lighting, shadows, atmosphere, fog, PBR materials,
+> parallax, ambient occlusion, reflections, water and wet surfaces are
+> implemented and compile clean. Global illumination, volumetrics, clouds and
+> the full post-processing chain land in later phases. See
 > [Roadmap](#roadmap).
 
 ---
@@ -91,6 +92,9 @@ the first entry is worth more than turning off the last five.
 | GI Resolution | GI & AO | 2 (half resolution) costs about a quarter of 1, and indirect light is too soft for the difference to show |
 | Volumetric Steps | Atmosphere | Light shafts are soft; half resolution is usually invisible |
 | Reflection Steps | Reflections | Lower this before disabling reflections outright |
+| Caustics Samples | Water | Cost is Caustics Samples x Wave Detail, so the two multiply |
+| AO Samples | GI & AO | GTAO traces a horizon search per sample |
+| Parallax Distance | Materials | Parallax costs full price at any range; fading it out early is nearly free performance |
 | Shadow Distance | Shadows | Scales cost roughly linearly, and spreads the same texels over more ground |
 | Parallax Steps | Materials | Only matters with a PBR resource pack loaded |
 
@@ -153,7 +157,7 @@ Summarised here; reasoning and workarounds in
 |---|---|---|
 | 0 | Project structure, options, validation, CI | Done |
 | 1 | GBuffer, shadows, sun/moon, atmosphere, fog | Done |
-| 2 | LabPBR, parallax, GTAO, reflections, water, wetness | Planned |
+| 2 | LabPBR, parallax, GTAO, reflections, water, wetness | Done |
 | 3 | Global illumination, volumetrics, clouds, Nether, End | Planned |
 | 4 | TAA, bloom, auto exposure, tone mapping, colour grading | Planned |
 | 5 | Preset tuning, debug views, docs, release | Planned |

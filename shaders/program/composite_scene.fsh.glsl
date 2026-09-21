@@ -15,6 +15,7 @@
 
 #include "/lib/common/common.glsl"
 #include "/lib/atmosphere/fog.glsl"
+#include "/lib/water/caustics.glsl"
 
 in vec2 texcoord;
 
@@ -46,6 +47,31 @@ void main() {
      * which is the right choice for deciding whether the fog is cave fog.
      */
     float skyAccess = texture(colortex4, texcoord).g;
+
+    /*
+     * Caustics while submerged.
+     *
+     * Looking into water from above, caustics are applied in the water pass
+     * itself, to the light that reached the bottom. From below there is no
+     * water surface in front of the geometry to hang them off, so they are
+     * applied here - and here they can be, because isEyeInWater says
+     * unambiguously that everything visible is underwater.
+     *
+     * Depth below the surface is approximated from eye altitude: the exact
+     * surface height is not available, but caustic strength varies slowly
+     * enough with depth that the approximation is not visible.
+     */
+#if ASTRA_ENABLE_CAUSTICS
+    if (isEyeInWater == 1) {
+        vec3 worldPos = worldPosition(scenePos);
+
+        // Distance from the surface, clamped to the range where caustics are
+        // still coherent rather than fully scattered.
+        float submergedDepth = clamp(eyeAltitude - worldPos.y + 2.0, 0.5, 16.0);
+
+        color *= waterCaustics(worldPos, submergedDepth, shadowLightDirection());
+    }
+#endif
 
     sceneColor = vec4(applyFog(color, scenePos, skyAccess), 1.0);
 }

@@ -110,8 +110,8 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
 #if !ASTRA_ENABLE_FOG
     return result;
 #else
-    float distance = length(scenePos);
-    vec3 rayDir = scenePos / max(distance, ASTRA_EPSILON);
+    float viewDistance = length(scenePos);
+    vec3 rayDir = scenePos / max(viewDistance, ASTRA_EPSILON);
 
     vec3 startWorld = cameraPosition;
     vec3 endWorld = cameraPosition + scenePos;
@@ -130,7 +130,7 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
 
         vec3 extinction = absorption + scatter;
 
-        result.transmittance = exp(-extinction * distance);
+        result.transmittance = exp(-extinction * viewDistance);
 
         // Light scattered into the path, lit by whatever reaches this depth.
         vec3 waterLight = shadowLightColor() * 0.04 + skyAmbientIrradiance(ASTRA_UP) * 0.02;
@@ -143,7 +143,7 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
     if (isEyeInWater == 2) {
         // Lava is effectively opaque within a block or two.
         vec3 extinction = vec3(1.4, 2.6, 4.2);
-        result.transmittance = exp(-extinction * distance);
+        result.transmittance = exp(-extinction * viewDistance);
         result.inScatter = vec3(2.2, 0.55, 0.08) * (1.0 - result.transmittance);
         return result;
     }
@@ -151,7 +151,7 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
     if (isEyeInWater == 3) {
         // Powder snow: dense, bright, near-white scattering.
         float extinction = 1.1;
-        result.transmittance = vec3(exp(-extinction * distance));
+        result.transmittance = vec3(exp(-extinction * viewDistance));
         result.inScatter = vec3(0.85, 0.90, 1.0) * (1.0 - result.transmittance);
         return result;
     }
@@ -184,7 +184,7 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
     extinction += vec3(0.010) * caveAmount * caveAmount;
 #endif
 
-    result.transmittance = exp(-extinction * distance);
+    result.transmittance = exp(-extinction * viewDistance);
 
     vec3 scatterColor = fogScatterColor(rayDir, saturate(skyAccess));
 
@@ -201,7 +201,7 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
     // Blindness collapses visibility to a few blocks.
     if (blindness > 0.0) {
         float blindExtinction = blindness * 0.35;
-        vec3 blindTransmittance = vec3(exp(-blindExtinction * distance));
+        vec3 blindTransmittance = vec3(exp(-blindExtinction * viewDistance));
         result.transmittance *= blindTransmittance;
         result.inScatter *= blindTransmittance;
     }

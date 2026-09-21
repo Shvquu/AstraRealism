@@ -4,7 +4,7 @@
 /*
  * AstraRealism - Fragment stage shared by every gbuffers program.
  *
- * Two output paths, selected by which program the stub compiled this as:
+ * Three output paths, selected by which program the stub compiled this as:
  *
  *   Deferred path - opaque geometry that runs before the deferred pass writes
  *   material properties into colortex1..4 and is shaded later.
@@ -12,14 +12,18 @@
  *   Forward path - geometry that runs after the deferred pass (translucents,
  *   particles, weather) cannot use the gbuffer, because the lighting pass has
  *   already consumed it. These shade immediately and blend into colortex0.
+ *   Water and glass additionally read colortex9, the copy of the lit opaque
+ *   scene, so they can refract and absorb what is behind them.
  *
- * The sky programs write nothing at all: the vanilla sky is discarded and
- * replaced by the atmosphere model in the deferred pass.
+ *   Sky path - writes nothing at all: the vanilla sky is discarded and replaced
+ *   by the atmosphere model in the deferred pass.
  */
 
 #include "/lib/common/common.glsl"
 #include "/lib/material/material.glsl"
 #include "/lib/material/material_id.glsl"
+#include "/lib/material/parallax.glsl"
+#include "/lib/material/wetness.glsl"
 
 //==============================================================================
 // PATH SELECTION
@@ -43,8 +47,11 @@
  */
 #if defined(PROGRAM_SKYBASIC) || defined(PROGRAM_SKYTEXTURED)
     #define ASTRA_PATH_SKY
-#elif defined(PROGRAM_WATER) || defined(PROGRAM_WEATHER) \
-   || defined(PROGRAM_HAND_WATER) \
+#elif defined(PROGRAM_WATER) || defined(PROGRAM_HAND_WATER)
+    // Translucent surfaces with access to the scene behind them.
+    #define ASTRA_PATH_TRANSLUCENT
+    #define ASTRA_PATH_FORWARD
+#elif defined(PROGRAM_WEATHER) \
    || defined(PROGRAM_TEXTURED) || defined(PROGRAM_TEXTURED_LIT)
     #define ASTRA_PATH_FORWARD
 #else
@@ -69,6 +76,7 @@ in vec3 bitangent;
 flat in int materialId;
 
 in vec2 midTexcoord;
+flat in vec2 tileSize;
 
 //==============================================================================
 // OUTPUTS
@@ -92,6 +100,10 @@ layout(location = 0) out vec4 sceneColor;
 #include "/lib/lighting/forward.glsl"
 #endif
 
+#if defined(ASTRA_PATH_TRANSLUCENT)
+#include "/lib/water/water_shading.glsl"
+#endif
+
 void main() {
 #if defined(ASTRA_PATH_SKY)
     /*
@@ -103,7 +115,33 @@ void main() {
     discard;
 
 #else
-    SurfaceMaterial material = fetchMaterial(texcoord, vertexColor, materialId);
+    float viewDistance = length(scenePos);
+    float dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
+
+    //--------------------------------------------------------------------------
+    // Parallax
+    //
+    // Runs before the material is fetched, because it decides which texel the
+    // material is fetched from. Self-shadowing needs the height at the hit, so
+    // the result is kept rather than only its UV.
+    //--------------------------------------------------------------------------
+
+    vec2 sampleUV = texcoord;
+    ParallaxResult parallax;
+    parallax.uv = texcoord;
+    parallax.height = 1.0;
+    parallax.hit = false;
+
+    #if ASTRA_ENABLE_POM && !defined(ASTRA_PATH_TRANSLUCENT)
+        vec3 viewDirTangent = toTangentSpace(normalize(-scenePos),
+                                             tangent, bitangent, normal);
+
+        parallax = applyParallax(texcoord, midTexcoord, tileSize,
+                                 viewDirTangent, viewDistance, dither);
+        sampleUV = parallax.uv;
+    #endif
+
+    SurfaceMaterial material = fetchMaterial(sampleUV, vertexColor, materialId);
 
     /*
      * Alpha handling.
@@ -127,21 +165,83 @@ void main() {
     vec3 shadingNormal = applyNormalMap(material.normalTangent, normal,
                                         tangent, bitangent);
 
+    //--------------------------------------------------------------------------
+    // Surface response to weather
+    //--------------------------------------------------------------------------
+
+    #if !defined(ASTRA_PATH_TRANSLUCENT)
+        applySnowMaterial(material.albedo, material.roughness, material.f0,
+                          material.porosity, materialId);
+
+        applyWetness(material.albedo, material.roughness, material.f0,
+                     shadingNormal, tangent, bitangent,
+                     worldPosition(scenePos), normal, lmcoord.y,
+                     material.porosity, materialId);
+    #endif
+
+    //--------------------------------------------------------------------------
+    // Parallax self-shadowing
+    //
+    // Folded into the ambient occlusion channel rather than applied to the
+    // albedo. Baking it into albedo would make the shadow survive into the
+    // reflection and the indirect bounce, where it does not belong.
+    //--------------------------------------------------------------------------
+
+    #if ASTRA_ENABLE_POM_SHADOW && defined(ASTRA_PATH_DEFERRED)
+        if (parallax.hit) {
+            vec3 lightDirTangent = toTangentSpace(
+                normalize(viewToSceneDir(shadowLightPosition)),
+                tangent, bitangent, normal);
+
+            material.ambientOcclusion *= parallaxSelfShadow(
+                sampleUV, midTexcoord, tileSize, lightDirTangent,
+                parallax.height, viewDistance, dither);
+        }
+    #endif
+
+    //--------------------------------------------------------------------------
+    // Output
+    //--------------------------------------------------------------------------
+
     #if defined(ASTRA_PATH_DEFERRED)
+        float wet = surfaceWetness(lmcoord.y, normal, materialId);
+
         encodeGBuffer(
             material.albedo, materialId,
             shadingNormal, normal,
             material.roughness, material.f0, material.emissive, material.porosity,
-            lmcoord, material.ambientOcclusion, 0.0,
+            lmcoord, material.ambientOcclusion, wet,
             gbufferA, gbufferB, gbufferC, gbufferD
         );
 
+    #elif defined(ASTRA_PATH_TRANSLUCENT)
+        /*
+         * Water and glass. Both read colortex9, the copy of the lit opaque
+         * scene written by the last deferred pass, and fold everything behind
+         * them into their own colour - so they emerge fully opaque and the
+         * hardware blend does not apply the background a second time.
+         */
+        vec2 screenUV = gl_FragCoord.xy / vec2(viewWidth, viewHeight);
+
+        WaterSurface surface;
+
+        if (materialId == MATID_WATER) {
+            surface = shadeWater(scenePos, normal, screenUV, gl_FragCoord.z,
+                                 lmcoord, material.albedo, colortex9, dither);
+        } else {
+            surface = shadeTranslucent(scenePos, shadingNormal, screenUV,
+                                       gl_FragCoord.z, material.albedo,
+                                       material.alpha, material.roughness,
+                                       material.f0, colortex9, dither);
+        }
+
+        sceneColor = vec4(surface.color, surface.alpha);
+
     #else
         /*
-         * Forward path. These fragments are blended over an already-lit scene,
-         * so they shade themselves with the same lighting model the deferred
-         * pass uses - just without access to screen-space effects that need the
-         * opaque gbuffer.
+         * Particles and weather. These blend over an already-lit scene and use
+         * the same lighting model as everything else, minus the screen-space
+         * effects that need opaque gbuffer data.
          */
         vec3 shaded = shadeForward(
             material, shadingNormal, normal, scenePos, lmcoord, materialId

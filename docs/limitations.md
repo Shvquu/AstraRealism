@@ -197,3 +197,87 @@ actually perceives a full moon.
 but darker than they will be once the eye-adaptation pass exists. Raising
 **Post Processing → Exposure → Manual Exposure** is the immediate workaround, at
 the cost of overexposing daytime.
+
+---
+
+## 12. Parallax does not correct depth
+
+**Constraint.** Correct parallax writes an adjusted `gl_FragDepth` so displaced
+geometry occludes properly at silhouettes. Writing that value disables early
+depth rejection for the entire gbuffers pass, which is the most overdrawn pass
+in the frame.
+
+**What we do instead.** Only the texture coordinate is displaced. Interior depth,
+self-shadowing and the way the surface shifts with the camera are all correct.
+
+**What you will see.** Looking at a wall edge-on, the displaced stones do not
+break the straight silhouette of the block. At any other angle the effect is
+complete.
+
+---
+
+## 13. Wave displacement applies only to upward-facing water
+
+**Constraint.** Water blocks at a chunk boundary are transformed by different
+draw calls. Displacing their side faces independently opens visible gaps,
+because nothing keeps the two sides in agreement.
+
+**What we do instead.** `waveDisplacement()` returns zero unless the geometric
+normal points up. Side faces stay put; the top surface still receives full wave
+normals and displacement.
+
+**What you will see.** The water surface undulates correctly. The vertical faces
+at the edge of a water body stay flat, which is only noticeable looking directly
+at a one-block waterfall.
+
+---
+
+## 14. Rough reflections are cone-traced, not prefiltered
+
+**Constraint.** A correct rough reflection integrates the whole GGX lobe against
+the environment, normally via a prefiltered mip pyramid. Screen-space data has
+no such pyramid — the "environment" is a single frame with no mip chain that
+respects the surface.
+
+**What we do instead.** `SSR_ROUGH_SAMPLES` rays are importance-sampled from the
+same GGX distribution the direct lighting uses, then accumulated across frames
+in `colortex8`.
+
+**What you will see.** Rough metal and wet stone reflect correctly but show some
+noise until the temporal accumulation converges, which takes a few frames after
+the camera stops. This improves substantially once TAA lands in Phase 4.
+
+---
+
+## 15. Ambient occlusion filters itself until TAA exists
+
+**Constraint.** GTAO traces a handful of slices per pixel, which is far too few
+to resolve occlusion without noise. The normal solution is temporal
+accumulation, which arrives with TAA in Phase 4.
+
+**What we do instead.** The lighting pass applies a nine-tap bilateral filter
+when it reads the AO channel, weighted by depth and normal so occlusion does not
+bleed across silhouettes. Folding it into an existing read avoids a dedicated
+full-screen pass.
+
+**What you will see.** At `AO_SAMPLES` of 4 or 6, some residual grain in creases.
+Raising the sample count or waiting for Phase 4 both resolve it.
+
+---
+
+## 16. Caustics are a convergence estimate, not photon transport
+
+**Constraint.** Physically correct caustics require tracing photons through the
+refracting surface and accumulating where they land. That is far outside a
+real-time budget.
+
+**What we do instead.** `causticConvergence()` measures how much the wave surface
+focuses neighbouring rays at a point, which is the quantity that produces the
+pattern. The result is centred on 1.0 rather than added, so focused regions
+brighten and the rest dims slightly — caustics redistribute light rather than
+creating it.
+
+**What you will see.** A convincing moving web of light. It will not match a
+path-traced reference, and its cost scales with `WATER_CAUSTICS_SAMPLES` times
+the wave octave count, making it one of the more expensive settings per affected
+pixel.

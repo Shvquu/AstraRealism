@@ -1,12 +1,12 @@
 // GENERATED FILE - DO NOT EDIT
 // Source: tools/gen_dimension_stubs.py + tools/program_manifest.py
-// Program: deferred.vsh  (world1: the end)
+// Program: deferred2.vsh  (world-1: the nether)
 //
-// screen-space ambient occlusion, folded into the gbuffer
+// screen-space reflections and the scene copy for translucents
 
 #version 420 compatibility
 
-#define DIM_END
-#define PROGRAM_DEFERRED_AO
+#define DIM_NETHER
+#define PROGRAM_DEFERRED_REFLECTIONS
 
 #include "/program/fullscreen.vsh.glsl"

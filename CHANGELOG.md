@@ -35,3 +35,27 @@ summary.
 - Support for Minecraft 26.3 and 1.21.11 from a single pack.
 
 [Unreleased]: https://github.com/OWNER/AstraRealism/commits/main
+
+### Added — Phase 2
+
+- Parallax occlusion mapping with self-shadowing, wrapped to atlas sprite bounds
+  so the march cannot walk into a neighbouring texture.
+- Ground-truth ambient occlusion (GTAO) with an SSAO fallback, filtered by a
+  depth- and normal-weighted bilateral kernel as it is read.
+- Screen-space reflections with binary refinement, a thickness test, GGX
+  importance-sampled rough reflections and temporal accumulation. Rays that
+  leave the screen fall back to the atmosphere model.
+- Water: travelling wave octaves with vertex displacement on upward faces,
+  Fresnel, refraction, Beer-Lambert absorption, particle scattering carrying the
+  biome tint, shoreline foam and caustics.
+- Wet surfaces: rain lowers roughness, darkens albedo in proportion to porosity
+  and shifts F0 toward water's own. Noise-driven puddles form on exposed level
+  surfaces, with animated rain ripples.
+- Snow material response: high albedo, soft sheen and strong subsurface
+  transport.
+
+### Fixed
+
+- `distance` and `texture` were used as local variable names in four files,
+  shadowing GLSL built-in functions. The validator now rejects any local named
+  after a built-in.

@@ -21,7 +21,7 @@
 /*
  * Radiance from nearby block light sources.
  *
- * The vanilla lightmap coordinate is already a distance falloff, but a linear
+ * The vanilla lightmap coordinate is already a sourceDistance falloff, but a linear
  * one: it steps down by a fixed amount per block. Real point-source falloff is
  * inverse-square, so raising the coordinate to a power recovers a curve much
  * closer to the real thing - bright close to the torch and dropping off fast.
@@ -54,13 +54,13 @@ vec3 heldLightRadiance(vec3 scenePos, vec3 normal) {
     int level = max(heldBlockLightValue, heldBlockLightValue2);
     if (level <= 0) return vec3(0.0);
 
-    float distance = length(scenePos);
+    float sourceDistance = length(scenePos);
 
     // Inverse-square falloff, softened near zero and cut off at the light's
     // nominal range so it does not linger as a faint glow across the room.
     float range = float(level);
-    float attenuation = saturate(1.0 - distance / range);
-    attenuation = attenuation * attenuation / (1.0 + distance * distance * 0.1);
+    float attenuation = saturate(1.0 - sourceDistance / range);
+    attenuation = attenuation * attenuation / (1.0 + sourceDistance * sourceDistance * 0.1);
 
     // The light sits at the camera, so its direction is the view direction.
     float ndotl = clampedDot(normal, normalize(-scenePos));

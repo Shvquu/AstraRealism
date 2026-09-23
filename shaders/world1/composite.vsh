@@ -2,11 +2,11 @@
 // Source: tools/gen_dimension_stubs.py + tools/program_manifest.py
 // Program: composite.vsh  (world1: the end)
 //
-// translucent resolve and scene-space effects
+// volumetric light and fog march
 
 #version 420 compatibility
 
 #define DIM_END
-#define PROGRAM_COMPOSITE_SCENE
+#define PROGRAM_COMPOSITE_VOLUMETRIC
 
 #include "/program/fullscreen.vsh.glsl"

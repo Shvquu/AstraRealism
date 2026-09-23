@@ -59,3 +59,37 @@ summary.
 - `distance` and `texture` were used as local variable names in four files,
   shadowing GLSL built-in functions. The validator now rejects any local named
   after a built-in.
+
+### Added — Phase 3
+
+- Screen-space global illumination with cosine-weighted ray gathering, temporal
+  accumulation and a two-iteration à-trous denoiser guided by luminance
+  variance. Radiance is gathered from the previous frame's lit scene, held in an
+  uncleared buffer that already existed for translucent refraction.
+- Volumetric light and fog as a single shadow-map ray march, with
+  Henyey-Greenstein anisotropy and a separate model for looking through water.
+  Replaces the analytic in-scattering where it runs; the analytic version
+  remains for the lower presets and beyond the shadow distance.
+- Volumetric clouds: Perlin-Worley density in a spherical shell, a weather field
+  driving coverage, dual-lobe scattering for the silver lining, Beer-powder
+  energy for bright cores, and self-shadowing via a light march.
+- Cloud shadows, sampled from the density field rather than a second render.
+- Dedicated Nether rendering: ambient light arriving from below where the lava
+  is, dense uniform haze that absorbs blue, and biome tint carried through.
+- Dedicated End rendering: violet dome, void below, unattenuated stars and
+  almost no fog, so distance reads as emptiness.
+- Temporal interleaving shared by GI, volumetrics and clouds: one pixel per NxN
+  tile is retraced each frame, the rest reuse reprojected history.
+
+### Changed
+
+- `GI_DENOISER_PASSES` now scales the denoiser's tap stride rather than the pass
+  count, which is fixed at two because à-trous needs one render pass per
+  iteration. Its range narrowed from 1–5 to 1–3.
+- The three resolution divisor options now control temporal interleaving rather
+  than render resolution. Tooltips updated to describe what they actually do.
+
+### Fixed
+
+- `step` was used as a local variable name in the cloud light march, shadowing a
+  GLSL built-in.

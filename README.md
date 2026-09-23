@@ -8,11 +8,11 @@ from the angular size of the sun. Wet stone reflects more because rain lowers
 its roughness, not because a blue filter was applied. The goal is an image that
 reads as real while staying unmistakably Minecraft.
 
-> **Status: Phase 2 of 5.** Lighting, shadows, atmosphere, fog, PBR materials,
-> parallax, ambient occlusion, reflections, water and wet surfaces are
-> implemented and compile clean. Global illumination, volumetrics, clouds and
-> the full post-processing chain land in later phases. See
-> [Roadmap](#roadmap).
+> **Status: Phase 3 of 5.** Lighting, shadows, atmosphere, PBR materials,
+> parallax, ambient occlusion, reflections, water, global illumination,
+> volumetric light, volumetric clouds and dedicated Nether and End rendering are
+> implemented and compile clean. Temporal anti-aliasing, bloom, auto exposure
+> and the lens effects land in Phase 4. See [Roadmap](#roadmap).
 
 ---
 
@@ -88,9 +88,11 @@ the first entry is worth more than turning off the last five.
 | Setting | Where | Notes |
 |---|---|---|
 | Shadow Resolution | Shadows | The single largest lever. 4096 → 2048 is close to a free doubling of shadow-pass throughput |
-| Cloud Steps | Clouds | Volumetric clouds are the most expensive single feature; Cloud Quality → 2D removes them entirely |
-| GI Resolution | GI & AO | 2 (half resolution) costs about a quarter of 1, and indirect light is too soft for the difference to show |
-| Volumetric Steps | Atmosphere | Light shafts are soft; half resolution is usually invisible |
+| Cloud Steps | Clouds | The most expensive single feature. Its cost is Cloud Steps x Cloud Light Steps, so the two multiply; Cloud Quality → 2D removes them entirely |
+| Cloud Resolution | Clouds | Divides cost by its **square**. Going from 1 to 2 removes three quarters of the cloud cost, and clouds change slowly enough that it rarely shows |
+| GI Resolution | GI & AO | Also divides by its square. Indirect light is low-frequency, so 2 is nearly free quality-wise |
+| Volumetric Resolution | Atmosphere | Same again. Light shafts are soft and slow-moving |
+| Volumetric Steps | Atmosphere | Each step costs a shadow map lookup |
 | Reflection Steps | Reflections | Lower this before disabling reflections outright |
 | Caustics Samples | Water | Cost is Caustics Samples x Wave Detail, so the two multiply |
 | AO Samples | GI & AO | GTAO traces a horizon search per sample |
@@ -145,6 +147,10 @@ Summarised here; reasoning and workarounds in
 - **Screen-space GI and reflections.** Light and reflections from geometry
   outside the frame do not contribute. Mitigated by a sky and block-light
   irradiance base, and by falling back to the sky model for escaped rays.
+- **Indirect light lags one frame.** GI gathers from the previous frame's lit
+  scene, which is structurally required in a deferred renderer.
+- **GI, volumetrics and clouds refresh one pixel per NxN tile per frame.** A
+  surface newly in view takes up to N² frames to converge.
 - **No hardware ray tracing.** Not available through Iris.
 - **Parallax needs a height map**, so it switches off without a LabPBR pack.
 - **`.zip` only.** Iris does not load `.jar` shader packs.
@@ -158,7 +164,7 @@ Summarised here; reasoning and workarounds in
 | 0 | Project structure, options, validation, CI | Done |
 | 1 | GBuffer, shadows, sun/moon, atmosphere, fog | Done |
 | 2 | LabPBR, parallax, GTAO, reflections, water, wetness | Done |
-| 3 | Global illumination, volumetrics, clouds, Nether, End | Planned |
+| 3 | Global illumination, volumetrics, clouds, Nether, End | Done |
 | 4 | TAA, bloom, auto exposure, tone mapping, colour grading | Planned |
 | 5 | Preset tuning, debug views, docs, release | Planned |
 

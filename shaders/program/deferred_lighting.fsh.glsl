@@ -38,7 +38,10 @@ void main() {
 
     if (isSky(depth)) {
         vec3 rayDir = viewRayFromUV(texcoord);
-        sceneColor = vec4(renderSky(rayDir), 1.0);
+
+        // Dimension-specific: the Nether has glowing haze where the overworld
+        // has an atmosphere, and the End a starlit violet dome with no sun.
+        sceneColor = vec4(dimensionSkyRadiance(rayDir), 1.0);
         return;
     }
 
@@ -79,7 +82,16 @@ void main() {
     surface.ao = filterAmbientOcclusion(colortex4, texcoord, depth, g.geoNormal);
 
     surface.materialId = g.materialId;
+
+    /*
+     * Indirect bounce light from the GI pass. Zero when GI is disabled, in
+     * which case the ambient and sky terms carry the whole indirect load.
+     */
+#if ASTRA_ENABLE_GI
+    surface.indirect = texture(colortex6, texcoord).rgb;
+#else
     surface.indirect = vec3(0.0);
+#endif
     surface.dither = interleavedGradientNoise(gl_FragCoord.xy, frameCounter);
 
     sceneColor = vec4(computeLighting(surface), 1.0);

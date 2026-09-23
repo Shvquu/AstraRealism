@@ -73,7 +73,43 @@ void main() {
     }
 #endif
 
+    /*
+     * Volumetric light and fog.
+     *
+     * When the volumetric march ran, it already integrated both the extinction
+     * and the in-scattering along this ray, including shadowing - so it
+     * replaces the analytic fog entirely rather than being added to it.
+     * Applying both would count the same air twice.
+     *
+     * With volumetrics disabled the march writes a fully transmissive result,
+     * this branch contributes nothing, and the analytic fog below handles the
+     * atmosphere on its own.
+     */
+#if ASTRA_ENABLE_VOLUMETRICS
+    vec4 volumetric = texture(colortex10, texcoord);
+
+    color = color * volumetric.a + volumetric.rgb;
+
+    /*
+     * Beyond the shadow distance the march stops, because there is no occlusion
+     * data to march against. The analytic fog covers that remainder.
+     *
+     * It ramps in only past the march's range rather than across the whole
+     * distance - applying it from the camera would re-fog the near stretch the
+     * volumetric pass has already accounted for, darkening everything close by.
+     */
+    float beyondMarch = saturate((length(scenePos) - shadowDistance)
+                                 / max(shadowDistance * 0.5, 1.0));
+
+    if (beyondMarch > 0.0) {
+        vec3 fogged = applyFog(color, scenePos, skyAccess);
+        color = mix(color, fogged, beyondMarch);
+    }
+
+    sceneColor = vec4(color, 1.0);
+#else
     sceneColor = vec4(applyFog(color, scenePos, skyAccess), 1.0);
+#endif
 }
 
 #endif // ASTRA_COMPOSITE_SCENE_FSH

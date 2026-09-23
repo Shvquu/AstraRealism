@@ -281,3 +281,94 @@ creating it.
 path-traced reference, and its cost scales with `WATER_CAUSTICS_SAMPLES` times
 the wave octave count, making it one of the more expensive settings per affected
 pixel.
+
+---
+
+## 17. Global illumination lags one frame behind
+
+**Constraint.** Screen-space GI needs lit surfaces to gather bounced light from.
+The GI pass must run *before* the lighting pass, because lighting consumes its
+output. The current frame's lit colour therefore does not exist when GI needs it.
+
+**What we do instead.** `colortex9` is not cleared, so at the start of a frame it
+still holds the previous frame's lit opaque scene. That is the radiance source.
+Every real-time screen-space GI implementation does this.
+
+**What you will see.** Nothing, in almost all cases. A light that changes
+abruptly — TNT, lightning, a lever on a lamp — has its *indirect* contribution
+appear one frame after its direct one. At 60 fps that is 16 ms.
+
+---
+
+## 18. Expensive systems refresh one pixel per tile per frame
+
+**Constraint.** GI, volumetrics and clouds are all far too expensive to evaluate
+for every pixel every frame.
+
+**What we do instead.** Each divides the screen into NxN tiles and retraces one
+pixel per tile per frame, cycling through all N² positions while the rest reuse
+reprojected history. `GI_RESOLUTION_DIVISOR`, `VL_RESOLUTION_DIVISOR` and
+`CLOUD_RESOLUTION_DIVISOR` set N.
+
+Iris's own `scale.<program>` directive would render a pass at reduced resolution
+instead, but it takes a fixed value in `shaders.properties` and cannot follow a
+user setting, and it renders into a sub-rectangle every later pass must then
+account for.
+
+**What you will see.** A surface that has just come into view takes up to N²
+frames to converge — visible as a brief softness trailing a fast camera turn at
+divisor 3 or 4. Pixels with no valid history trace immediately regardless of
+whose turn it is, so nothing ever stays unlit.
+
+---
+
+## 19. The GI denoiser runs a fixed two passes
+
+**Constraint.** À-trous filtering needs one render pass per iteration, and the
+program list is fixed when the shader compiles. A runtime option cannot add or
+remove passes.
+
+**What we do instead.** Two passes always run, at strides 1 and 2.
+`GI_DENOISER_PASSES` scales those strides rather than changing the count, which
+buys the wider footprint more iterations would have given without the extra
+passes.
+
+**What you will see.** Higher values smooth more but erase fine detail in the
+bounce light. The practical range is genuinely 1–3.
+
+---
+
+## 20. Cloud shadows sample density, not a shadow map
+
+**Constraint.** A correct cloud shadow renders the cloud layer a second time from
+the sun's point of view. That doubles the cost of the most expensive system in
+the pack.
+
+**What we do instead.** `cloudShadow()` samples the density field once, where the
+sun ray from the shaded point crosses the middle of the cloud layer.
+
+**What you will see.** Soft, correctly-placed cloud shadows that drift with the
+clouds. They do not capture a cloud's internal structure, which for a shadow cast
+from several hundred blocks up is not resolvable anyway. The shadow is floored
+well above black, because even under heavy overcast the ground is lit by diffused
+light rather than cut off.
+
+---
+
+## 21. The Nether and the End ignore the sky lightmap for ambient
+
+**Constraint.** Minecraft reports a sky light level of zero everywhere in both
+dimensions, because neither has a sky. The overworld correctly gates ambient
+light on that value — a block deep in a cave receives no skylight.
+
+Applying the same gate in the Nether or the End would leave both lit by block
+light alone and otherwise completely black.
+
+**What we do instead.** `dimensionAmbientLight()` belongs to each dimension and
+decides its own gating. The overworld gates on sky light; the Nether and the End
+do not, because their ambient comes from lava glow and a violet dome
+respectively, neither of which the sky lightmap describes.
+
+**What you will see.** Both dimensions are lit. The Nether's ambient arrives from
+*below*, inverting the overworld's basic cue — that is deliberate, and it is
+where most of its character comes from.

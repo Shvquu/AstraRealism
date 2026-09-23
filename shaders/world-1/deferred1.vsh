@@ -2,11 +2,11 @@
 // Source: tools/gen_dimension_stubs.py + tools/program_manifest.py
 // Program: deferred1.vsh  (world-1: the nether)
 //
-// opaque deferred lighting composition
+// global illumination trace and temporal accumulation
 
 #version 420 compatibility
 
 #define DIM_NETHER
-#define PROGRAM_DEFERRED_LIGHTING
+#define PROGRAM_DEFERRED_GI
 
 #include "/program/fullscreen.vsh.glsl"

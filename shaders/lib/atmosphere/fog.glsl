@@ -4,6 +4,7 @@
 #include "/lib/common/common.glsl"
 #include "/lib/atmosphere/sun_moon.glsl"
 #include "/lib/atmosphere/scattering.glsl"
+#include "/lib/dimension/dimension.glsl"
 
 /*
  * AstraRealism - Fog.
@@ -79,17 +80,7 @@ float averageFogDensity(vec3 startWorld, vec3 endWorld) {
  * source because there is no sky to sample.
  */
 vec3 fogScatterColor(vec3 rayDir, float skyAccess) {
-    vec3 skyColour = skyRadianceFull(rayDir);
-
-    /*
-     * Cave fog has no sky contribution at all. Its colour comes from block
-     * light bouncing around the cave, which is warm and dim - blending toward
-     * the sky colour underground is what makes most packs' caves look like they
-     * are filled with grey smoke.
-     */
-    vec3 caveColour = blackbodyToRGB(float(BLOCKLIGHT_TEMPERATURE)) * 0.015;
-
-    return mix(caveColour, skyColour, skyAccess);
+    return dimensionFogColor(rayDir, skyAccess);
 }
 
 //==============================================================================
@@ -166,14 +157,12 @@ FogResult computeFog(vec3 scenePos, float skyAccess) {
     density *= 1.0 + rainStrength * 2.5;
 
     /*
-     * Base extinction coefficient, in inverse blocks. Chosen so that at default
-     * density the horizon at a few hundred blocks is visibly hazy but not
-     * obscured.
+     * Extinction comes from the dimension. Overworld air is a thin atmosphere;
+     * the Nether's haze is an order of magnitude denser and absorbs blue rather
+     * than red; the End is almost empty, because its sense of scale depends on
+     * distance reading as emptiness rather than as murk.
      */
-    const float FOG_EXTINCTION_BASE = 0.0012;
-
-    // Fog scatters slightly more blue than red, like a thin atmosphere.
-    vec3 extinction = vec3(FOG_EXTINCTION_BASE) * vec3(0.92, 1.0, 1.15) * density;
+    vec3 extinction = dimensionFogExtinction() * density / max(FOG_DENSITY, 0.001);
 
 #if defined(CAVE_FOG)
     /*

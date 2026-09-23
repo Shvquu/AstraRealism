@@ -19,9 +19,10 @@
  *   6   RGBA16F  GI irradiance accumulation                      KEEP
  *   7   RGBA16F  GI first/second moments + history length        KEEP
  *   8   RGBA16F  SSR accumulation                                KEEP
- *   9   RGBA16F  lit opaque scene, copied for translucents       clear
- *   10  RGBA16F  volumetric scattering.rgb + transmittance.a     clear
- *   11  RGBA16F  volumetric clouds, temporally reprojected       KEEP
+ *   9   RGBA16F  lit opaque scene: this frame's copy for         KEEP
+ *                translucents, last frame's radiance for GI
+ *   10  RGBA16F  volumetric scattering.rgb + transmittance.a     KEEP
+ *   11  RGBA16F  volumetric clouds + history length              KEEP
  *   12  RGBA16F  bloom mip chain (uses mip levels, not a 2nd buffer)  clear
  *   13  RGBA32F  previous-frame linear depth + motion vectors    KEEP
  *   14  RGBA16F  atmosphere LUTs (transmittance / sky view)      KEEP
@@ -41,14 +42,25 @@
  * is not enough: linear depth used for disocclusion tests, and an exposure
  * value that is integrated across hundreds of frames.
  *
- * Why colortex9 exists
- * --------------------
+ * Why colortex9 exists, and why it is not cleared
+ * -----------------------------------------------
  * Translucent geometry needs the colour of whatever is behind it, for
  * refraction and for Beer-Lambert absorption through water. It cannot read
  * colortex0 directly: Iris does not flip buffers within a gbuffers pass, so
  * sampling colortex0 while blending into it is a read-write hazard with
- * undefined results. The last deferred pass therefore writes the finished
- * opaque scene to colortex9 as well, and translucents read that copy.
+ * undefined results. The reflections pass therefore writes the finished opaque
+ * scene to colortex9 as well, and translucents read that copy.
+ *
+ * Leaving it uncleared makes it serve a second purpose for free. Screen-space
+ * global illumination needs lit surfaces to gather bounced light from, but the
+ * GI pass necessarily runs BEFORE the lighting pass - a deferred renderer
+ * cannot have both. Because colortex9 survives the frame boundary, at the start
+ * of frame N it still holds the lit scene from frame N-1, which is exactly the
+ * radiance source GI needs. The reflections pass then overwrites it later in
+ * the same frame for the translucents.
+ *
+ * One buffer, two consumers, no extra memory. The cost is that indirect light
+ * lags the direct light by one frame.
  */
 
 //==============================================================================
@@ -95,6 +107,8 @@ const bool colortex5Clear  = false;
 const bool colortex6Clear  = false;
 const bool colortex7Clear  = false;
 const bool colortex8Clear  = false;
+const bool colortex9Clear  = false;
+const bool colortex10Clear = false;
 const bool colortex11Clear = false;
 const bool colortex13Clear = false;
 const bool colortex14Clear = false;

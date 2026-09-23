@@ -550,26 +550,6 @@ def check_option_consistency(report: Report) -> None:
 # this set and unread is an error, and an option in this set that HAS become
 # used is also an error, so the list can only shrink.
 PENDING_OPTIONS: dict[str, str] = {
-    # Phase 3 - global illumination, volumetrics, clouds
-    "GI_SAMPLES": "phase 3",
-    "GI_STEPS": "phase 3",
-    "GI_RADIUS": "phase 3",
-    "GI_RESOLUTION_DIVISOR": "phase 3",
-    "GI_TEMPORAL_FRAMES": "phase 3",
-    "GI_DENOISER_PASSES": "phase 3",
-    "VL_STEPS": "phase 3",
-    "VL_STRENGTH": "phase 3",
-    "VL_RESOLUTION_DIVISOR": "phase 3",
-    "VL_ANISOTROPY": "phase 3",
-    "CLOUD_STEPS": "phase 3",
-    "CLOUD_LIGHT_STEPS": "phase 3",
-    "CLOUD_DENSITY": "phase 3",
-    "CLOUD_COVERAGE": "phase 3",
-    "CLOUD_SPEED": "phase 3",
-    "CLOUD_ALTITUDE": "phase 3",
-    "CLOUD_THICKNESS": "phase 3",
-    "CLOUD_RESOLUTION_DIVISOR": "phase 3",
-
     # Phase 4 - temporal anti-aliasing, bloom, exposure, lens effects
     "TAA_STRENGTH": "phase 4",
     "TAA_SHARPEN": "phase 4",

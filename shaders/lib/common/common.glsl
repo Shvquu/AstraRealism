@@ -25,4 +25,7 @@
 // TAA jitter and the resolve pass removes it.
 #include "/lib/post/jitter.glsl"
 
+// Shared by every temporally accumulated system: GI, volumetrics, clouds.
+#include "/lib/common/temporal.glsl"
+
 #endif // ASTRA_COMMON_GLSL

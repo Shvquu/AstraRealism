@@ -2,11 +2,11 @@
 // Source: tools/gen_dimension_stubs.py + tools/program_manifest.py
 // Program: composite.fsh  (world0: overworld and modded dimensions)
 //
-// translucent resolve and scene-space effects
+// volumetric light and fog march
 
 #version 420 compatibility
 
 #define DIM_OVERWORLD
-#define PROGRAM_COMPOSITE_SCENE
+#define PROGRAM_COMPOSITE_VOLUMETRIC
 
-#include "/program/composite_scene.fsh.glsl"
+#include "/program/composite_volumetric.fsh.glsl"

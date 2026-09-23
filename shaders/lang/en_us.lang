@@ -136,7 +136,7 @@ option.GI_STEPS=GI Ray Steps
 comment.GI_STEPS=Steps per GI ray. Higher values find occluders more reliably and reduce light leaking.
 
 option.GI_RESOLUTION_DIVISOR=GI Resolution
-comment.GI_RESOLUTION_DIVISOR=Renders GI at a fraction of screen resolution. 2 means half resolution, which costs about a quarter as much. Indirect light is low-frequency, so the upsample is rarely visible.
+comment.GI_RESOLUTION_DIVISOR=Spreads the cost of GI across frames instead of resolution. At 2, one pixel in every 2x2 tile is retraced each frame and the rest reuse their history, so the work is quartered. Indirect light changes slowly, so the delay is rarely visible - but a surface that has just come into view takes this many frames squared to converge.
 
 option.GI_TEMPORAL_FRAMES=GI Temporal Frames
 comment.GI_TEMPORAL_FRAMES=How many frames of history to blend. Higher values are cleaner but make lighting lag behind fast changes.
@@ -145,7 +145,7 @@ option.GI_DENOISER=GI Denoiser
 comment.GI_DENOISER=Variance-guided spatial filter that removes the remaining noise from the GI trace. Strongly recommended.
 
 option.GI_DENOISER_PASSES=Denoiser Passes
-comment.GI_DENOISER_PASSES=Number of a-trous filter iterations. Each pass doubles the effective blur radius.
+comment.GI_DENOISER_PASSES=How far apart the denoiser's samples are spread. The filter always runs two passes - that count is fixed when the shader compiles and cannot follow a setting - so this widens each pass instead. Higher values smooth more aggressively at the cost of fine detail in the bounce light.
 
 option.AO_MODE=Ambient Occlusion
 comment.AO_MODE=Darkens creases and contact points where ambient light cannot reach. GTAO is ground-truth-based and noticeably more accurate than classic SSAO for a modest extra cost.
@@ -330,7 +330,7 @@ option.VL_STEPS=Volumetric Steps
 comment.VL_STEPS=Ray march steps for volumetric light. More steps reduce banding, especially when looking toward the sun.
 
 option.VL_RESOLUTION_DIVISOR=Volumetric Resolution
-comment.VL_RESOLUTION_DIVISOR=Renders volumetrics at a fraction of screen resolution. Light shafts are soft, so half resolution is usually indistinguishable.
+comment.VL_RESOLUTION_DIVISOR=Spreads the cost of volumetrics across frames. At 2, one pixel in every 2x2 tile is remarched each frame and the rest reuse their history. Light shafts are soft and change slowly, so this is usually indistinguishable from marching every pixel.
 
 option.VL_ANISOTROPY=Volumetric Anisotropy
 comment.VL_ANISOTROPY=How strongly light scatters forward. Higher values make rays much brighter when looking toward the sun and dimmer when looking away, which is how real haze behaves.
@@ -371,7 +371,7 @@ option.CLOUD_LIGHT_STEPS=Cloud Light Steps
 comment.CLOUD_LIGHT_STEPS=Steps taken toward the sun at each cloud sample to compute self-shadowing. Low values flatten clouds; high values are expensive because the cost multiplies with cloud steps.
 
 option.CLOUD_RESOLUTION_DIVISOR=Cloud Resolution
-comment.CLOUD_RESOLUTION_DIVISOR=Renders clouds at a fraction of screen resolution and reprojects them across frames.
+comment.CLOUD_RESOLUTION_DIVISOR=Spreads the cost of the cloud march across frames. At 2, one pixel in every 2x2 tile is remarched each frame and the rest reuse their reprojected history. Clouds are the most expensive thing in the pack and among the slowest to change, so this is the single most effective cloud setting.
 
 # ------------------------------------------------------------------------------
 # Anti-aliasing

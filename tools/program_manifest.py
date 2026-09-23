@@ -58,6 +58,10 @@ class Program:
     # Stages that use a different shared body than `body`. Composite-style
     # programs all share one trivial fullscreen vertex shader.
     stage_bodies: dict[str, str] = field(default_factory=dict)
+    # Extra `#define NAME value` lines the stub emits before including the body.
+    # Lets one shared body serve several programs that differ only by a
+    # parameter - the two a-trous iterations, which differ solely in tap stride.
+    extra_defines: tuple[str, ...] = ()
 
     def body_for(self, stage: str) -> str:
         return self.stage_bodies.get(stage, self.body)
@@ -81,7 +85,8 @@ def _gbuffer(name: str, macro: str, note: str = "") -> Program:
     )
 
 
-def _composite(name: str, body: str, macro: str, note: str = "") -> Program:
+def _composite(name: str, body: str, macro: str, note: str = "",
+               extra_defines: tuple[str, ...] = ()) -> Program:
     return Program(
         name=name,
         stages=_COMPOSITE_STAGES,
@@ -89,6 +94,7 @@ def _composite(name: str, body: str, macro: str, note: str = "") -> Program:
         macro=macro,
         note=note,
         stage_bodies={"vsh": _FULLSCREEN_VSH},
+        extra_defines=extra_defines,
     )
 
 
@@ -147,19 +153,39 @@ PROGRAMS: tuple[Program, ...] = (
     # --- deferred ------------------------------------------------------------
     #
     # Order is fixed and load-bearing:
-    #   deferred   ambient occlusion, written into the gbuffer
-    #   deferred1  lighting, which consumes that occlusion
-    #   deferred2  reflections, which need the lit scene, plus the copy of it
-    #              that translucent geometry reads
+    #   deferred    ambient occlusion, written into the gbuffer
+    #   deferred1   global illumination, gathering from the PREVIOUS frame's
+    #               lit scene - it has to run before lighting, which consumes it
+    #   deferred2/3 two a-trous filter iterations over the GI result
+    #   deferred4   lighting, which consumes both occlusion and GI
+    #   deferred5   clouds, needing the sky to composite over and running before
+    #               reflections so the scene copy contains them
+    #   deferred6   reflections, plus the copy of the lit scene that translucent
+    #               geometry reads
     _composite("deferred", "deferred_ao", "PROGRAM_DEFERRED_AO",
                "screen-space ambient occlusion, folded into the gbuffer"),
-    _composite("deferred1", "deferred_lighting", "PROGRAM_DEFERRED_LIGHTING",
+    _composite("deferred1", "deferred_gi", "PROGRAM_DEFERRED_GI",
+               "global illumination trace and temporal accumulation"),
+    # Two a-trous iterations. A-trous needs one render pass per iteration and
+    # the program list is fixed at compile time, so the count cannot follow
+    # GI_DENOISER_PASSES - that option scales the tap stride instead.
+    _composite("deferred2", "deferred_gi_filter", "PROGRAM_DEFERRED_GI_FILTER",
+               "global illumination spatial filter, narrow taps",
+               extra_defines=("ASTRA_GI_FILTER_STRIDE 1",)),
+    _composite("deferred3", "deferred_gi_filter", "PROGRAM_DEFERRED_GI_FILTER",
+               "global illumination spatial filter, wide taps",
+               extra_defines=("ASTRA_GI_FILTER_STRIDE 2",)),
+    _composite("deferred4", "deferred_lighting", "PROGRAM_DEFERRED_LIGHTING",
                "opaque deferred lighting composition"),
-    _composite("deferred2", "deferred_reflections", "PROGRAM_DEFERRED_REFLECTIONS",
+    _composite("deferred5", "deferred_clouds", "PROGRAM_DEFERRED_CLOUDS",
+               "volumetric clouds, composited into the sky"),
+    _composite("deferred6", "deferred_reflections", "PROGRAM_DEFERRED_REFLECTIONS",
                "screen-space reflections and the scene copy for translucents"),
 
     # --- composite -----------------------------------------------------------
-    _composite("composite", "composite_scene", "PROGRAM_COMPOSITE_SCENE",
+    _composite("composite", "composite_volumetric", "PROGRAM_COMPOSITE_VOLUMETRIC",
+               "volumetric light and fog march"),
+    _composite("composite1", "composite_scene", "PROGRAM_COMPOSITE_SCENE",
                "translucent resolve and scene-space effects"),
 
     # --- final ---------------------------------------------------------------

@@ -107,7 +107,7 @@ const float shadowDistortionFactor = 0.85; // [0.50 0.60 0.70 0.80 0.85 0.90 0.9
 #define GI_TEMPORAL_FRAMES 24 // [4 8 12 16 24 32 48]
 
 #define GI_DENOISER // Variance-guided a-trous spatial filter.
-#define GI_DENOISER_PASSES 3 // [1 2 3 4 5]
+#define GI_DENOISER_PASSES 2 // [1 2 3]
 
 //==============================================================================
 // REFLECTIONS

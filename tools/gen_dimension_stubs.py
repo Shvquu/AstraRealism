@@ -44,6 +44,10 @@ def stub_source(program: Program, stage: str, dimension: Dimension) -> str:
 
     where = dimension.folder or "shaders root"
 
+    # Parameters that let one shared body serve several programs - the two
+    # a-trous iterations differ only by their tap stride.
+    extra = "".join(f"#define {d}\n" for d in program.extra_defines)
+
     return (
         f"// {GENERATED_MARKER}\n"
         f"// Source: tools/gen_dimension_stubs.py + tools/program_manifest.py\n"
@@ -55,6 +59,7 @@ def stub_source(program: Program, stage: str, dimension: Dimension) -> str:
         f"\n"
         f"#define {dimension.macro}\n"
         f"#define {program.macro}\n"
+        f"{extra}"
         f"\n"
         f'#include "/program/{include}"\n'
     )

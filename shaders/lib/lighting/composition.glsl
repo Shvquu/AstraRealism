@@ -8,6 +8,8 @@
 #include "/lib/lighting/blocklight.glsl"
 #include "/lib/atmosphere/sun_moon.glsl"
 #include "/lib/atmosphere/scattering.glsl"
+#include "/lib/atmosphere/clouds.glsl"
+#include "/lib/dimension/dimension.glsl"
 #include "/lib/material/material_id.glsl"
 
 /*
@@ -96,6 +98,16 @@ vec3 computeLighting(LightingInputs surface) {
     }
 #endif
 
+    /*
+     * Clouds shade the ground beneath them. Applied to the shadow-map result
+     * rather than to the light colour, because it is occlusion of the same
+     * directional source - a cloud and a block both stand between this surface
+     * and the sun, and the only difference is scale.
+     */
+#if ASTRA_ENABLE_CLOUD_SHADOWS
+    shadow.visibility *= cloudShadow(worldPosition(surface.scenePos));
+#endif
+
     if (shadow.visibility > 0.0 && ndotl > 0.0) {
         BRDFResult brdf = evaluateBRDF(surface.normal, viewDir, lightDir,
                                        surface.albedo, f0, surface.roughness, metal);
@@ -131,8 +143,14 @@ vec3 computeLighting(LightingInputs surface) {
     // Sky irradiance
     //--------------------------------------------------------------------------
 
-    vec3 skyIrradiance = skyAmbientIrradiance(surface.normal);
-    vec3 skyLight = skyLightRadiance(surface.lightmap.y, skyIrradiance);
+    /*
+     * Ambient irradiance comes from the dimension, not from the atmosphere
+     * model directly. The Nether has no sky and is lit from below by lava; the
+     * End has a dim violet dome and a void. Calling the overworld's scattering
+     * model in either would be the "tinted overworld" the specification
+     * explicitly rules out.
+     */
+    vec3 skyLight = dimensionAmbientLight(surface.normal, surface.lightmap.y);
 
     // Ambient occlusion applies to indirect light only. Applying it to direct
     // light is the single most common way to make a PBR scene look muddy.
@@ -181,8 +199,14 @@ vec3 computeLighting(LightingInputs surface) {
     //--------------------------------------------------------------------------
 
     if (!metal) {
+        /*
+         * Blends from block-light colour in enclosed spaces toward the
+         * dimension's own ambient in open ones. Using the dimension's ambient
+         * rather than the sky model keeps this consistent in the Nether and the
+         * End, where there is no sky to take a colour from.
+         */
         vec3 ambient = mix(blackbodyToRGB(float(BLOCKLIGHT_TEMPERATURE)),
-                           skyIrradiance * ASTRA_INV_PI,
+                           dimensionAmbientLight(surface.normal, 1.0) * ASTRA_INV_PI,
                            saturate(surface.lightmap.y));
 
         result += surface.albedo * ambient * AMBIENT_INTENSITY * occlusion;

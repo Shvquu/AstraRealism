@@ -8,11 +8,11 @@ from the angular size of the sun. Wet stone reflects more because rain lowers
 its roughness, not because a blue filter was applied. The goal is an image that
 reads as real while staying unmistakably Minecraft.
 
-> **Status: Phase 3 of 5.** Lighting, shadows, atmosphere, PBR materials,
-> parallax, ambient occlusion, reflections, water, global illumination,
-> volumetric light, volumetric clouds and dedicated Nether and End rendering are
-> implemented and compile clean. Temporal anti-aliasing, bloom, auto exposure
-> and the lens effects land in Phase 4. See [Roadmap](#roadmap).
+> **Status: Phase 4 of 5.** Every rendering system in the specification is
+> implemented and compiles clean — lighting, shadows, atmosphere, materials,
+> reflections, water, global illumination, volumetrics, clouds, both other
+> dimensions, and the full post-processing chain. Phase 5 is preset tuning,
+> profiling and release polish. See [Roadmap](#roadmap).
 
 ---
 
@@ -165,7 +165,7 @@ Summarised here; reasoning and workarounds in
 | 1 | GBuffer, shadows, sun/moon, atmosphere, fog | Done |
 | 2 | LabPBR, parallax, GTAO, reflections, water, wetness | Done |
 | 3 | Global illumination, volumetrics, clouds, Nether, End | Done |
-| 4 | TAA, bloom, auto exposure, tone mapping, colour grading | Planned |
+| 4 | TAA, bloom, auto exposure, DOF, motion blur, lens effects | Done |
 | 5 | Preset tuning, debug views, docs, release | Planned |
 
 ---

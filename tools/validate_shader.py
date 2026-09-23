@@ -550,29 +550,6 @@ def check_option_consistency(report: Report) -> None:
 # this set and unread is an error, and an option in this set that HAS become
 # used is also an error, so the list can only shrink.
 PENDING_OPTIONS: dict[str, str] = {
-    # Phase 4 - temporal anti-aliasing, bloom, exposure, lens effects
-    "TAA_STRENGTH": "phase 4",
-    "TAA_SHARPEN": "phase 4",
-    "BLOOM_STRENGTH": "phase 4",
-    "BLOOM_RADIUS": "phase 4",
-    "BLOOM_MIPS": "phase 4",
-    "EXPOSURE_SPEED_UP": "phase 4",
-    "EXPOSURE_SPEED_DOWN": "phase 4",
-    "EXPOSURE_MIN": "phase 4",
-    "EXPOSURE_MAX": "phase 4",
-    "EXPOSURE_LOW_PERCENT": "phase 4",
-    "EXPOSURE_HIGH_PERCENT": "phase 4",
-    "DOF_SAMPLES": "phase 4",
-    "DOF_FOCUS_MODE": "phase 4",
-    "DOF_FOCUS_DISTANCE": "phase 4",
-    "DOF_FOCAL_LENGTH": "phase 4",
-    "DOF_APERTURE": "phase 4",
-    "DOF_FOCUS_SPEED": "phase 4",
-    "MOTION_BLUR_STRENGTH": "phase 4",
-    "CA_STRENGTH": "phase 4",
-    "GRAIN_STRENGTH": "phase 4",
-    "LENS_FLARE_STRENGTH": "phase 4",
-    "LENS_DIRT_STRENGTH": "phase 4",
 }
 
 

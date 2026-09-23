@@ -183,10 +183,33 @@ PROGRAMS: tuple[Program, ...] = (
                "screen-space reflections and the scene copy for translucents"),
 
     # --- composite -----------------------------------------------------------
+    #
+    # Post-processing order is load-bearing:
+    #   composite   volumetric march, needing translucents already in the depth
+    #               buffer so shafts stop at a water surface
+    #   composite1  scene resolve: volumetrics applied, fog, caustics
+    #   composite2  TAA, before anything blurs or meters the image
+    #   composite3  exposure metering, on the resolved image but before bloom
+    #               adds brightness the meter would then chase
+    #   composite4  bloom bright pass
+    #   composite5  bloom combine, reading the mip chain Iris generates for it
+    #   composite6  depth of field and motion blur
     _composite("composite", "composite_volumetric", "PROGRAM_COMPOSITE_VOLUMETRIC",
                "volumetric light and fog march"),
     _composite("composite1", "composite_scene", "PROGRAM_COMPOSITE_SCENE",
                "translucent resolve and scene-space effects"),
+    _composite("composite2", "composite_taa", "PROGRAM_COMPOSITE_TAA",
+               "temporal anti-aliasing resolve"),
+    _composite("composite3", "composite_exposure", "PROGRAM_COMPOSITE_EXPOSURE",
+               "exposure metering and autofocus"),
+    _composite("composite4", "composite_bloom", "PROGRAM_COMPOSITE_BLOOM",
+               "bloom bright pass",
+               extra_defines=("ASTRA_BLOOM_STAGE 1",)),
+    _composite("composite5", "composite_bloom", "PROGRAM_COMPOSITE_BLOOM",
+               "bloom mip gather and combine",
+               extra_defines=("ASTRA_BLOOM_STAGE 2",)),
+    _composite("composite6", "composite_camera", "PROGRAM_COMPOSITE_CAMERA",
+               "depth of field and motion blur"),
 
     # --- final ---------------------------------------------------------------
     _composite("final", "final_output", "PROGRAM_FINAL",

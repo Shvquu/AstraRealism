@@ -177,26 +177,21 @@ to reintroduce when editing the buffer layout.
 
 ---
 
-## 11. Automatic exposure is not implemented yet
+## 11. Automatic exposure meters, it does not simulate an eye
 
-**Status.** Phase 4. Until then, **Exposure Mode** defaults to Manual, and
-selecting Automatic behaves as Manual rather than doing nothing visible.
+**Status.** Implemented in Phase 4. `EXPOSURE_MODE` defaults to Automatic.
 
-**Why it matters more than it sounds.** Scene radiance in this pack is in
-physical-ish units — `SUN_INTENSITY` is a radiance value, not a screen
-brightness. A single fixed exposure therefore cannot suit both a sunlit field
-and a moonlit one, because the real ratio between them is enormous.
+**Constraint.** Human dark adaptation takes several minutes and spans about
+nine orders of magnitude. Reproducing that faithfully would leave a player
+effectively blind for minutes after entering a cave.
 
-**What we do instead.** `MANUAL_EXPOSURE` defaults to 0.25, calibrated so a
-mid-grey surface (albedo 0.18) in full daylight lands on a well-exposed midtone.
-`MOON_INTENSITY` is compressed to roughly a 15:1 ratio against the sun rather
-than the physical 400,000:1, which is also close to how dark-adapted vision
-actually perceives a full moon.
+**What we do instead.** The asymmetry between light and dark adaptation is kept
+— brightening is faster than darkening, as in the eye — but both are compressed
+to seconds, and the range is clamped by `EXPOSURE_MIN` and `EXPOSURE_MAX`.
 
-**What you will see.** Daylight is correctly exposed. Nights are dark — playable,
-but darker than they will be once the eye-adaptation pass exists. Raising
-**Post Processing → Exposure → Manual Exposure** is the immediate workaround, at
-the cost of overexposing daytime.
+**What you will see.** Stepping out of a cave briefly overexposes and settles
+over about a second. That is deliberately faster than reality, and the speed is
+adjustable under Post Processing → Exposure.
 
 ---
 
@@ -372,3 +367,70 @@ respectively, neither of which the sky lightmap describes.
 **What you will see.** Both dimensions are lit. The Nether's ambient arrives from
 *below*, inverting the overworld's basic cue — that is deliberate, and it is
 where most of its character comes from.
+
+---
+
+## 22. Exposure metering samples 32 points, not a full histogram
+
+**Constraint.** A true luminance histogram needs a compute shader writing into an
+SSBO with atomics. That would make automatic exposure depend on
+`COMPUTE_SHADERS` and `SSBO`, which this pack requests as *optional* so it still
+loads on Iris builds and hardware lacking them.
+
+**What we do instead.** 32 taps from mip level 5 of the scene buffer — each
+already the average of a large region, so a single bright speck cannot swing the
+result. Percentiles come from ten bisection steps over those samples rather than
+a sort. All of it runs at one pixel, so the loop cost is irrelevant.
+
+**What you will see.** Exposure that settles correctly and does not flicker. It
+responds slightly differently to a scene with an unusual luminance distribution
+than a full histogram would, which is not something you can notice without
+comparing side by side.
+
+---
+
+## 23. Bloom downsamples with the hardware mip chain
+
+**Constraint.** A textbook bloom runs a chain of render passes, each downsampling
+with a weighted 13-tap filter. At `BLOOM_MIPS` of 7 that is seven extra
+full-screen passes.
+
+**What we do instead.** Iris generates the mip pyramid in one step when the
+combine pass declares `colortex12MipmapEnabled`. The hardware filter is a box
+rather than the Karis-weighted kernel, so the *upsample* has to compensate —
+hence the 3x3 tent filter at every level rather than a plain bilinear read.
+
+**What you will see.** Bloom that falls off smoothly over multiple scales. Under
+a very bright point source against a dark background you may find it marginally
+boxier than a full custom chain would give.
+
+---
+
+## 24. Depth of field and motion blur compose rather than chain
+
+**Constraint.** A fragment shader cannot read its own output. With both effects
+in one pass, motion blur has to sample the pre-defocus image.
+
+**What we do instead.** The two results are averaged when both are enabled.
+Ordering them properly would need a second full-screen pass that is a no-op in
+the default configuration, since both are off by default.
+
+**What you will see.** Nothing, unless you enable both at once — in which case
+the motion smear is slightly sharper than it should be.
+
+---
+
+## 25. TAA motion vectors ignore the sub-pixel jitter
+
+**Constraint.** The jitter is applied to `gl_Position` after projection, so the
+projection matrix Iris reports is unjittered. Unprojecting a depth value
+therefore reconstructs a position offset by up to half a pixel from where the
+sample was actually taken.
+
+**What we do instead.** Nothing — the error is sub-pixel and affects the motion
+vector, not the history lookup. Correcting it would mean threading the jitter
+offset through every screen-space effect that unprojects depth, which is GI, SSR,
+volumetrics and contact shadows.
+
+**What you will see.** Very slightly softer resolution of fine detail under
+motion than a jitter-corrected implementation would give. Not ghosting.

@@ -260,22 +260,16 @@ const float shadowDistortionFactor = 0.85; // [0.50 0.60 0.70 0.80 0.85 0.90 0.9
 // EXPOSURE
 //==============================================================================
 
-/*
- * 0 = manual, 1 = automatic (histogram-based eye adaptation)
- *
- * Defaults to manual because the automatic metering pass is not implemented
- * yet. Selecting Automatic currently behaves as Manual rather than doing
- * nothing visible - see docs/limitations.md.
- */
-#define EXPOSURE_MODE 0 // [0 1]
+// 0 = manual, 1 = automatic (metered eye adaptation)
+#define EXPOSURE_MODE 1 // [0 1]
 
 /*
- * Scene radiance is in physical-ish units: SUN_INTENSITY is a radiance value,
- * not a screen brightness. A mid-grey surface (albedo 0.18) in full sun reaches
- * roughly 1.1 before exposure, which ACES would push close to white.
+ * Used only when EXPOSURE_MODE is Manual.
  *
- * 0.25 brings that back to a well-exposed midtone. It is calibrated for
- * daylight, so nights are correspondingly dark until automatic exposure lands.
+ * Scene radiance is in physical-ish units: SUN_INTENSITY is a radiance value,
+ * not a screen brightness. 0.25 puts a mid-grey surface in full daylight on a
+ * well-exposed midtone, which makes it the right fixed value if you prefer
+ * exposure not to move - at the cost of dark nights.
  */
 #define MANUAL_EXPOSURE 0.25 // [0.05 0.1 0.15 0.2 0.25 0.35 0.5 0.75 1.0 1.5 2.0 4.0 8.0]
 

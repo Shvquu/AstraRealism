@@ -93,3 +93,33 @@ summary.
 
 - `step` was used as a local variable name in the cloud light march, shadowing a
   GLSL built-in.
+
+### Added — Phase 4
+
+- Temporal anti-aliasing with YCoCg variance clipping, reversible tone weighting
+  to suppress fireflies, motion- and edge-aware blend weights, and an unsharp
+  mask to recover the softening. FXAA offered as a spatial alternative.
+- Automatic exposure: 32 taps from a scene mip level, percentiles found by
+  bisection, keyed to middle grey and adapted in log space with separate rates
+  for brightening and darkening.
+- Bloom as a bright pass with a soft knee, the hardware mip pyramid for
+  downsampling, and a 3x3 tent filter on the way back up to remove the box
+  filter's character. Mixed rather than added, so it redistributes energy.
+- Depth of field from a real thin-lens circle-of-confusion model, with a
+  scatter-as-gather bokeh that prevents sharp foregrounds bleeding into blurred
+  backgrounds, and temporally smoothed autofocus.
+- Motion blur along screen-space motion vectors, with a shutter fraction per
+  quality level and the held item excluded from the camera-delta term.
+- Lens effects: chromatic aberration applied as a magnification difference,
+  luminance-weighted film grain, bloom-modulated lens dirt, and lens flare
+  ghosts positioned along the source-to-centre axis with an occlusion test.
+
+### Changed
+
+- The final pass now applies metered exposure instead of the manual constant.
+  `EXPOSURE_MODE` defaults back to Automatic.
+
+### Fixed
+
+- `distance` was used as a local variable in the lens flare loop, shadowing a
+  GLSL built-in.

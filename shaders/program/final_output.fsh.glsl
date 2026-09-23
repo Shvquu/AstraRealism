@@ -19,6 +19,8 @@
 #include "/lib/common/debug.glsl"
 #include "/lib/post/tonemap.glsl"
 #include "/lib/post/grading.glsl"
+#include "/lib/post/exposure.glsl"
+#include "/lib/post/lens.glsl"
 
 in vec2 texcoord;
 
@@ -92,20 +94,47 @@ void main() {
     // Normal output
     //--------------------------------------------------------------------------
 
-    vec3 color = texture(colortex0, texcoord).rgb;
+    /*
+     * Chromatic aberration is applied while sampling rather than afterwards,
+     * because it IS a sampling difference - the three channels are read at
+     * slightly different magnifications, which cannot be reproduced by
+     * post-processing an already-combined colour.
+     */
+    vec3 color = applyChromaticAberration(colortex0, texcoord);
 
     /*
-     * Exposure. Automatic metering arrives in a later phase and will replace
-     * this with a value read from the histogram buffer; until then the manual
-     * value applies in both modes so the image is correctly exposed either way.
+     * Exposure, metered and adapted in the exposure pass. Falls back to the
+     * manual value when automatic metering is disabled.
      */
-    color *= MANUAL_EXPOSURE;
+    color *= readExposure(colortex15);
+
+    //--------------------------------------------------------------------------
+    // Lens flare
+    //
+    // Added before tone mapping so it is compressed along with everything else.
+    // A flare added afterwards sits on top of the image at full intensity and
+    // reads as a decal rather than as light reaching the sensor.
+    //--------------------------------------------------------------------------
+
+#if ASTRA_ENABLE_LENS_FLARE
+    vec3 sunScreenPos;
+    float sunVisibility = sunFlareVisibility(depthtex1, sunScreenPos);
+
+    color = applyLensFlare(color, texcoord, sunScreenPos, sunVisibility);
+#endif
 
     color = applyColorGrading(color);
 
     color = applyToneMapping(color);
 
     color *= vignetteFactor(texcoord);
+
+    /*
+     * Grain last among the tonal operations, on display-range values. Film
+     * grain is a property of the recording medium, not of the light, so it
+     * should not be tone mapped.
+     */
+    color = applyFilmGrain(color, gl_FragCoord.xy);
 
     // Scene maths is linear; the framebuffer expects sRGB.
     color = linearToSrgb(saturate(color));

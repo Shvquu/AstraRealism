@@ -47,7 +47,23 @@ composite         volumetric light and fog march through the shadow map
 composite1        apply volumetrics, analytic fog beyond the march, caustics
    |              -> colortex0
    v
-final             exposure, grading, tone mapping, vignette, dither
+composite2        TAA resolve: blend with reprojected history, clamp, sharpen
+   |              -> colortex0, colortex5 (history)
+   v
+composite3        exposure metering and autofocus, at one pixel
+   |              -> colortex15
+   v
+composite4        bloom bright pass
+   |              -> colortex12
+   v
+composite5        bloom mip gather and combine, plus lens dirt
+   |              -> colortex0
+   v
+composite6        depth of field and motion blur
+   |              -> colortex0
+   v
+final             chromatic aberration, exposure, flare, grading, tone mapping,
+                  vignette, grain, dither
                   -> the screen
 ```
 
@@ -94,6 +110,13 @@ to be lit, so they cannot run earlier. They must not include water, so they
 cannot run later. That leaves exactly one slot, which is also the only correct
 place to copy the opaque scene for translucents to read.
 
+**TAA before anything that blurs or meters.** Bloom sampling an unresolved frame
+flickers, and the exposure meter would chase the aliasing rather than the scene.
+
+**Exposure metering after TAA but before bloom.** Metering a frame that already
+has bloom added means the meter reads brightness its own output created, which
+feeds back: brighter reading, lower exposure, dimmer bloom, brighter reading.
+
 **Fog after translucents.** Fog attenuates everything between the camera and the
 surface, including water and particles. Applying it before they are drawn leaves
 them unfogged and floating in front of the haze.
@@ -113,17 +136,17 @@ and wash the sky out.
 | colortex2 | RGBA16 | gbuffers (opaque) | deferred, deferred1/2/3/4/6, debug | yes |
 | colortex3 | RGBA8 | gbuffers (opaque) | deferred4/6, debug | yes |
 | colortex4 | RGBA16F | gbuffers (opaque), deferred | deferred4/6, composite, debug | yes |
-| colortex5 | RGBA16F | *planned* TAA resolve | TAA resolve | **no** |
+| colortex5 | RGBA16F | composite2 | composite2 (previous frame) | **no** |
 | colortex6 | RGBA16F | deferred1, deferred2/3 | deferred2/3/4 | **no** |
 | colortex7 | RGBA16F | deferred1 | deferred2/3 | **no** |
 | colortex8 | RGBA16F | deferred6 | deferred6 (previous frame) | **no** |
 | colortex9 | RGBA16F | deferred6 | gbuffers_water, **deferred1 (previous frame)** | **no** |
 | colortex10 | RGBA16F | composite | composite1, composite (previous frame) | **no** |
 | colortex11 | RGBA16F | deferred5 | deferred5 (previous frame) | **no** |
-| colortex12 | RGBA16F | *planned* bloom chain | final | yes |
+| colortex12 | RGBA16F | composite4 | composite5 (with mip chain) | yes |
 | colortex13 | RGBA32F | deferred6 | deferred1/5/6, composite, *planned* TAA | **no** |
 | colortex14 | RGBA16F | *planned* atmosphere LUTs | deferred4, composite1 | **no** |
-| colortex15 | RGBA32F | *planned* exposure state | final | **no** |
+| colortex15 | RGBA32F | composite3 | composite3 (previous frame), composite6, final | **no** |
 
 colortex9 is the one worth a second look: it is written once per frame with the
 lit opaque scene, read later that same frame by translucent geometry, and read
@@ -182,7 +205,11 @@ pass and is already actionable.
 | deferred6 (reflections) | Screen-space march per reflective pixel | Reflection Steps x Rough Samples |
 | gbuffers_water | Wave noise, refraction, caustics | Wave Detail x Caustics Samples |
 | composite (volumetrics) | Shadow lookup per march step | Volumetric Steps, divided by Volumetric Resolution **squared** |
-| final | Tone mapping, grading | Screen resolution |
+| composite2 (TAA) | Nine taps plus a history read | Screen resolution |
+| composite3 (exposure) | 32 taps, at one pixel | Negligible |
+| composite4/5 (bloom) | Nine taps per mip level | Bloom Mips |
+| composite6 (camera) | Bokeh gather | DOF Samples, and only when enabled |
+| final | Tone mapping, grading, lens effects | Screen resolution |
 
 Several rows multiply rather than add, and those are the ones worth
 internalising:
